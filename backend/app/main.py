@@ -7,7 +7,15 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.database import get_supabase
-from app.schemas import ChartPoint, DashboardResponse, GoalCreate, GoalResponse, HoldingCreate, HoldingResponse
+from app.schemas import (
+    ChartPoint,
+    DashboardResponse,
+    GoalCreate,
+    GoalResponse,
+    HoldingCreate,
+    HoldingResponse,
+    HoldingUpdate,
+)
 from app.services.dividend_service import build_dashboard, enrich_holdings, fetch_ticker_snapshot
 
 settings = get_settings()
@@ -92,6 +100,28 @@ def create_holding(payload: HoldingCreate) -> HoldingResponse:
 
     if not rows:
         raise HTTPException(status_code=500, detail="Unable to save holding.")
+
+    return enrich_holdings(rows)[0]
+
+
+@app.put("/holdings/{holding_id}", response_model=HoldingResponse)
+def update_holding(holding_id: int, payload: HoldingUpdate) -> HoldingResponse:
+    try:
+        fetch_ticker_snapshot(payload.ticker)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+    response = (
+        get_supabase()
+        .table("holdings")
+        .update({"ticker": payload.ticker, "shares": payload.shares})
+        .eq("id", holding_id)
+        .execute()
+    )
+    rows = response.data or []
+
+    if not rows:
+        raise HTTPException(status_code=404, detail="Holding not found.")
 
     return enrich_holdings(rows)[0]
 

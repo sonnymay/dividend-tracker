@@ -1,6 +1,10 @@
 import unittest
 from datetime import datetime
+from unittest.mock import patch
 
+from fastapi.testclient import TestClient
+
+from app.main import app
 from app.schemas import GoalResponse, HoldingResponse
 from app.services.dividend_service import build_dashboard, normalize_dividend_yield_percent
 
@@ -46,6 +50,47 @@ class DividendServiceTests(unittest.TestCase):
         self.assertEqual(dashboard.progress_percent, 10.2)
         self.assertEqual(dashboard.recommendation.ticker if dashboard.recommendation else None, "SCHD")
         self.assertIsNotNone(dashboard.projection.estimated_weeks_to_goal)
+
+    @patch("app.main.enrich_holdings")
+    @patch("app.main.fetch_ticker_snapshot")
+    @patch("app.main.get_supabase")
+    def test_update_holding_returns_enriched_record(
+        self,
+        mock_get_supabase,
+        mock_fetch_ticker_snapshot,
+        mock_enrich_holdings,
+    ) -> None:
+        client = TestClient(app)
+
+        mock_fetch_ticker_snapshot.return_value = object()
+        mock_table = mock_get_supabase.return_value.table.return_value
+        mock_update = mock_table.update.return_value
+        mock_eq = mock_update.eq.return_value
+        mock_eq.execute.return_value.data = [
+            {"id": 7, "ticker": "SCHD", "shares": 12, "created_at": datetime.now().isoformat()}
+        ]
+        mock_enrich_holdings.return_value = [
+            HoldingResponse(
+                id=7,
+                ticker="SCHD",
+                shares=12,
+                price=30.94,
+                dividend_yield_percent=3.44,
+                annual_dividend_per_share=1.05,
+                annual_income=12.66,
+                monthly_income=1.05,
+                market_value=371.28,
+                created_at=datetime.now(),
+            )
+        ]
+
+        response = client.put("/holdings/7", json={"ticker": "schd", "shares": 12})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["ticker"], "SCHD")
+        mock_fetch_ticker_snapshot.assert_called_once_with("SCHD")
+        mock_table.update.assert_called_once_with({"ticker": "SCHD", "shares": 12.0})
+        mock_update.eq.assert_called_once_with("id", 7)
 
 
 if __name__ == "__main__":

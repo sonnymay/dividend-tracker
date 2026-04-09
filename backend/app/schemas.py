@@ -13,6 +13,10 @@ class HoldingCreate(BaseModel):
         return value.strip().upper()
 
 
+class HoldingUpdate(HoldingCreate):
+    pass
+
+
 class HoldingResponse(BaseModel):
     id: int
     ticker: str
@@ -64,4 +68,3 @@ class ChartPoint(BaseModel):
     month: date
     total_monthly_income: float
     created_at: datetime | None = None
-

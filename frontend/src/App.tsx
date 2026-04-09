@@ -36,31 +36,48 @@ function App() {
   const [holdings, setHoldings] = useState<Holding[]>([])
   const [chartPoints, setChartPoints] = useState<ChartPoint[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [savingGoal, setSavingGoal] = useState(false)
   const [savingHolding, setSavingHolding] = useState(false)
+  const [savingHoldingId, setSavingHoldingId] = useState<number | null>(null)
+  const [removingHoldingId, setRemovingHoldingId] = useState<number | null>(null)
+  const [editingHoldingId, setEditingHoldingId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [goalForm, setGoalForm] = useState({ monthly_target: '5000', weekly_investment: '250' })
   const [holdingForm, setHoldingForm] = useState({ ticker: '', shares: '' })
+  const [editingHoldingForm, setEditingHoldingForm] = useState({ ticker: '', shares: '' })
 
-  async function refresh() {
-    setError(null)
-    const [goalResponse, holdingsResponse, dashboardResponse, chartResponse] = await Promise.all([
-      api.getGoal(),
-      api.getHoldings(),
-      api.getDashboard(),
-      api.getChart(),
-    ])
+  async function refresh(options?: { preserveError?: boolean; background?: boolean }) {
+    if (!options?.preserveError) {
+      setError(null)
+    }
+    if (options?.background) {
+      setRefreshing(true)
+    }
+    try {
+      const [goalResponse, holdingsResponse, dashboardResponse, chartResponse] = await Promise.all([
+        api.getGoal(),
+        api.getHoldings(),
+        api.getDashboard(),
+        api.getChart(),
+      ])
 
-    startTransition(() => {
-      setGoal(goalResponse)
-      setGoalForm({
-        monthly_target: goalResponse.monthly_target ? String(goalResponse.monthly_target) : '5000',
-        weekly_investment: String(goalResponse.weekly_investment ?? 0),
+      startTransition(() => {
+        setGoal(goalResponse)
+        setGoalForm({
+          monthly_target: goalResponse.monthly_target ? String(goalResponse.monthly_target) : '5000',
+          weekly_investment: String(goalResponse.weekly_investment ?? 0),
+        })
+        setHoldings(holdingsResponse)
+        setDashboard(dashboardResponse)
+        setChartPoints(chartResponse)
       })
-      setHoldings(holdingsResponse)
-      setDashboard(dashboardResponse)
-      setChartPoints(chartResponse)
-    })
+    } finally {
+      if (options?.background) {
+        setRefreshing(false)
+      }
+    }
   }
 
   useEffect(() => {
@@ -79,13 +96,15 @@ function App() {
     event.preventDefault()
     setSavingGoal(true)
     setError(null)
+    setNotice(null)
 
     try {
       await api.saveGoal({
         monthly_target: Number(goalForm.monthly_target),
         weekly_investment: Number(goalForm.weekly_investment),
       })
-      await refresh()
+      setNotice('Goal updated.')
+      await refresh({ background: true })
     } catch (submitError: unknown) {
       setError(submitError instanceof Error ? submitError.message : 'Unable to save goal.')
     } finally {
@@ -97,6 +116,7 @@ function App() {
     event.preventDefault()
     setSavingHolding(true)
     setError(null)
+    setNotice(null)
 
     try {
       await api.addHolding({
@@ -104,7 +124,8 @@ function App() {
         shares: Number(holdingForm.shares),
       })
       setHoldingForm({ ticker: '', shares: '' })
-      await refresh()
+      setNotice('Holding added.')
+      await refresh({ background: true })
     } catch (submitError: unknown) {
       setError(submitError instanceof Error ? submitError.message : 'Unable to add holding.')
     } finally {
@@ -112,14 +133,57 @@ function App() {
     }
   }
 
+  function startEditingHolding(holding: Holding) {
+    setEditingHoldingId(holding.id)
+    setEditingHoldingForm({
+      ticker: holding.ticker,
+      shares: String(holding.shares),
+    })
+    setError(null)
+    setNotice(null)
+  }
+
+  function cancelEditingHolding() {
+    setEditingHoldingId(null)
+    setEditingHoldingForm({ ticker: '', shares: '' })
+  }
+
+  async function handleEditHoldingSubmit(id: number) {
+    setSavingHoldingId(id)
+    setError(null)
+    setNotice(null)
+
+    try {
+      await api.updateHolding(id, {
+        ticker: editingHoldingForm.ticker.trim().toUpperCase(),
+        shares: Number(editingHoldingForm.shares),
+      })
+      cancelEditingHolding()
+      setNotice('Holding updated.')
+      await refresh({ background: true })
+    } catch (submitError: unknown) {
+      setError(submitError instanceof Error ? submitError.message : 'Unable to update holding.')
+    } finally {
+      setSavingHoldingId(null)
+    }
+  }
+
   async function handleDeleteHolding(id: number) {
     setError(null)
+    setNotice(null)
+    setRemovingHoldingId(id)
 
     try {
       await api.deleteHolding(id)
-      await refresh()
+      if (editingHoldingId === id) {
+        cancelEditingHolding()
+      }
+      setNotice('Holding removed.')
+      await refresh({ background: true })
     } catch (deleteError: unknown) {
       setError(deleteError instanceof Error ? deleteError.message : 'Unable to remove holding.')
+    } finally {
+      setRemovingHoldingId(null)
     }
   }
 
@@ -176,7 +240,29 @@ function App() {
 
         {error ? (
           <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-            {error}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span>{error}</span>
+              <button
+                className="rounded-full border border-rose-300 px-3 py-1 text-xs font-medium text-rose-700 transition hover:bg-rose-100"
+                onClick={() => {
+                  setNotice(null)
+                  refresh({ preserveError: true, background: true }).catch((refreshError: unknown) => {
+                    setError(
+                      refreshError instanceof Error ? refreshError.message : 'Unable to refresh dashboard.',
+                    )
+                  })
+                }}
+                type="button"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {notice ? (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+            {notice}
           </div>
         ) : null}
 
@@ -207,7 +293,7 @@ function App() {
               </label>
               <button
                 className="col-span-full inline-flex h-12 items-center justify-center rounded-2xl bg-stone-950 px-5 font-medium text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-400"
-                disabled={savingGoal}
+                disabled={savingGoal || refreshing}
                 type="submit"
               >
                 {savingGoal ? 'Saving goal...' : 'Save goal'}
@@ -367,7 +453,7 @@ function App() {
               </label>
               <button
                 className="col-span-full inline-flex h-12 items-center justify-center rounded-2xl bg-emerald-800 px-5 font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-400"
-                disabled={savingHolding}
+                disabled={savingHolding || refreshing}
                 type="submit"
               >
                 {savingHolding ? 'Adding holding...' : 'Add holding'}
@@ -386,31 +472,96 @@ function App() {
                   <span />
                 </div>
                 <div className="divide-y divide-stone-200">
-                  {topHoldings.map((holding) => (
-                    <div
-                      key={holding.id}
-                      className="grid grid-cols-[1.05fr_0.75fr_0.85fr_0.85fr_auto] items-center gap-3 px-4 py-3 text-sm text-stone-700"
-                    >
-                      <div>
-                        <p className="font-heading text-lg text-stone-950">{holding.ticker}</p>
-                        <p className="text-xs text-stone-500">
-                          {holding.dividend_yield_percent.toFixed(2)}% yield
-                        </p>
-                      </div>
-                      <span>{holding.shares}</span>
-                      <span>{formatCurrency(holding.price)}</span>
-                      <span className="font-medium text-emerald-900">
-                        {formatCurrency(holding.monthly_income)}
-                      </span>
-                      <button
-                        className="rounded-full border border-stone-300 px-3 py-1 text-xs text-stone-600 transition hover:border-rose-400 hover:text-rose-700"
-                        onClick={() => handleDeleteHolding(holding.id)}
-                        type="button"
+                  {topHoldings.map((holding) => {
+                    const isEditing = editingHoldingId === holding.id
+                    const isSavingEdit = savingHoldingId === holding.id
+                    const isRemoving = removingHoldingId === holding.id
+
+                    return (
+                      <div
+                        key={holding.id}
+                        className="grid grid-cols-[1.05fr_0.75fr_0.85fr_0.85fr_auto] items-center gap-3 px-4 py-3 text-sm text-stone-700"
                       >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
+                        <div>
+                          {isEditing ? (
+                            <input
+                              className="h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm uppercase outline-none transition focus:border-emerald-700"
+                              value={editingHoldingForm.ticker}
+                              onChange={(event) =>
+                                setEditingHoldingForm((current) => ({
+                                  ...current,
+                                  ticker: event.target.value,
+                                }))
+                              }
+                            />
+                          ) : (
+                            <p className="font-heading text-lg text-stone-950">{holding.ticker}</p>
+                          )}
+                          <p className="text-xs text-stone-500">
+                            {holding.dividend_yield_percent.toFixed(2)}% yield
+                          </p>
+                        </div>
+                        {isEditing ? (
+                          <input
+                            className="h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none transition focus:border-emerald-700"
+                            inputMode="decimal"
+                            value={editingHoldingForm.shares}
+                            onChange={(event) =>
+                              setEditingHoldingForm((current) => ({
+                                ...current,
+                                shares: event.target.value,
+                              }))
+                            }
+                          />
+                        ) : (
+                          <span>{holding.shares}</span>
+                        )}
+                        <span>{formatCurrency(holding.price)}</span>
+                        <span className="font-medium text-emerald-900">
+                          {formatCurrency(holding.monthly_income)}
+                        </span>
+                        <div className="flex flex-wrap justify-end gap-2">
+                          {isEditing ? (
+                            <>
+                              <button
+                                className="rounded-full border border-emerald-300 px-3 py-1 text-xs text-emerald-800 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                disabled={isSavingEdit || refreshing}
+                                onClick={() => handleEditHoldingSubmit(holding.id)}
+                                type="button"
+                              >
+                                {isSavingEdit ? 'Saving...' : 'Save'}
+                              </button>
+                              <button
+                                className="rounded-full border border-stone-300 px-3 py-1 text-xs text-stone-600 transition hover:border-stone-400 hover:bg-stone-50"
+                                disabled={isSavingEdit}
+                                onClick={cancelEditingHolding}
+                                type="button"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              className="rounded-full border border-stone-300 px-3 py-1 text-xs text-stone-600 transition hover:border-emerald-400 hover:text-emerald-700"
+                              disabled={refreshing || removingHoldingId !== null || savingHolding}
+                              onClick={() => startEditingHolding(holding)}
+                              type="button"
+                            >
+                              Edit
+                            </button>
+                          )}
+                          <button
+                            className="rounded-full border border-stone-300 px-3 py-1 text-xs text-stone-600 transition hover:border-rose-400 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            disabled={isSavingEdit || isRemoving || refreshing}
+                            onClick={() => handleDeleteHolding(holding.id)}
+                            type="button"
+                          >
+                            {isRemoving ? 'Removing...' : 'Remove'}
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             ) : (
@@ -420,7 +571,11 @@ function App() {
         </section>
 
         <footer className="pb-4 text-center text-xs uppercase tracking-[0.24em] text-stone-500">
-          {loading ? 'Loading dividend dashboard...' : 'Dividend Tracker ready'}
+          {loading
+            ? 'Loading dividend dashboard...'
+            : refreshing
+              ? 'Syncing live dividend data...'
+              : 'Dividend Tracker ready'}
         </footer>
       </div>
     </main>

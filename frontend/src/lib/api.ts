@@ -76,6 +76,8 @@ export const api = {
   getHoldings: () => request<Holding[]>('/holdings'),
   addHolding: (payload: { ticker: string; shares: number }) =>
     request<Holding>('/holdings', { method: 'POST', body: JSON.stringify(payload) }),
+  updateHolding: (id: number, payload: { ticker: string; shares: number }) =>
+    request<Holding>(`/holdings/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteHolding: (id: number) => request<void>(`/holdings/${id}`, { method: 'DELETE' }),
   getDashboard: () => request<Dashboard>('/dashboard'),
   getChart: () => request<ChartPoint[]>('/chart'),
