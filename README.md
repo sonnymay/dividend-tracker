@@ -4,7 +4,7 @@ A simple dividend income tracker built with:
 
 - Backend: FastAPI + yfinance + Supabase
 - Frontend: React + Vite + Tailwind CSS + Recharts
-- Deploy: Railway (backend) + Vercel (frontend)
+- Deploy: Render (backend) + Vercel (frontend)
 
 ## Project Structure
 
@@ -50,24 +50,29 @@ Run the SQL in [backend/supabase/schema.sql](/Users/santipapmay/Desktop/Dividend
 
 ## Deploy
 
-### Railway
+### Render
 
-Recommended for automatic deploys: create a GitHub repo and connect Railway to it.
+Recommended for automatic deploys: create a GitHub repo and connect Render to it.
 
-Railway service settings:
+Render web service settings:
 
 - Root directory: `backend`
-- Config file path: `/backend/railway.toml`
-- Start command: handled by [backend/railway.toml](/Users/santipapmay/Desktop/Dividend%20Tracker/backend/railway.toml#L1)
-- Generate a public domain after first deploy
+- Python version: handled by [backend/.python-version](/Users/santipapmay/Desktop/Dividend%20Tracker/backend/.python-version#L1)
+- Blueprint config: [render.yaml](/Users/santipapmay/Desktop/Dividend%20Tracker/render.yaml#L1)
+- If configuring manually:
+  - Runtime: `Python`
+  - Root directory: `backend`
+  - Build command: `pip install -r requirements.txt`
+  - Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+  - Health check path: `/health`
 
-Railway environment variables:
+Render environment variables:
 
 - `SUPABASE_URL`
 - `SUPABASE_KEY`
 - `FRONTEND_ORIGIN`
 
-`FRONTEND_ORIGIN` should be your Vercel URL, for example `https://your-app.vercel.app`.
+`FRONTEND_ORIGIN` should be your Vercel URL, for example `https://dividend-tracker.vercel.app`.
 
 ### Vercel
 
@@ -85,13 +90,13 @@ Vercel environment variables:
 
 - `VITE_API_BASE_URL`
 
-`VITE_API_BASE_URL` should be your Railway backend URL, for example `https://your-api.up.railway.app`.
+`VITE_API_BASE_URL` should be your Render backend URL, for example `https://dividend-tracker-api.onrender.com`.
 
 ## GitHub Setup
 
 Create one GitHub repository for this whole project. That gives you:
 
-- Railway autodeploys for the backend from `backend/`
+- Render autodeploys for the backend from `backend/`
 - Vercel autodeploys for the frontend from `frontend/`
 - Preview deploys on every push
 - A clean path to share or keep iterating
@@ -99,7 +104,7 @@ Create one GitHub repository for this whole project. That gives you:
 Once the repo exists, the normal flow is:
 
 1. Push this project to GitHub.
-2. Import the repo into Railway and set the service root directory to `backend`.
+2. Import the repo into Render and set the service root directory to `backend`, or use the included `render.yaml`.
 3. Import the same repo into Vercel and set the root directory to `frontend`.
 4. Add env vars in both platforms.
-5. Update `FRONTEND_ORIGIN` in Railway after Vercel gives you the real frontend URL.
+5. Update `FRONTEND_ORIGIN` in Render after Vercel gives you the real frontend URL.
