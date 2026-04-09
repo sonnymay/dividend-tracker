@@ -56,9 +56,8 @@ function App() {
       setRefreshing(true)
     }
     try {
-      const [goalResponse, holdingsResponse, dashboardResponse, chartResponse] = await Promise.all([
+      const [goalResponse, dashboardResponse, chartResponse] = await Promise.all([
         api.getGoal(),
-        api.getHoldings(),
         api.getDashboard(),
         api.getChart(),
       ])
@@ -69,7 +68,7 @@ function App() {
           monthly_target: goalResponse.monthly_target ? String(goalResponse.monthly_target) : '5000',
           weekly_investment: String(goalResponse.weekly_investment ?? 0),
         })
-        setHoldings(holdingsResponse)
+        setHoldings(dashboardResponse.holdings)
         setDashboard(dashboardResponse)
         setChartPoints(chartResponse)
       })
@@ -200,14 +199,13 @@ function App() {
           <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl">
               <p className="font-mono text-xs uppercase tracking-[0.3em] text-stone-500">
-                Dividend income cockpit
+                Dividend tracker
               </p>
               <h1 className="mt-4 max-w-xl font-heading text-4xl tracking-[-0.04em] text-stone-950 sm:text-5xl">
-                Track how close your portfolio is to replacing a paycheck.
+                Track your stocks and dividend income.
               </h1>
               <p className="mt-4 max-w-lg text-sm leading-6 text-stone-600 sm:text-base">
-                Add your holdings, set a monthly income goal, and let the dashboard translate live
-                dividend data into progress, projections, and next-buy guidance.
+                Add your stocks, set a monthly goal, and see your dividend progress with live data.
               </p>
             </div>
 
@@ -267,7 +265,7 @@ function App() {
         ) : null}
 
         <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-          <Panel title="Goal settings" subtitle="Set the monthly income target and weekly investment pace you want to model.">
+          <Panel title="Goal settings" subtitle="Set your monthly dividend goal and weekly investment amount.">
             <form className="grid gap-4 sm:grid-cols-2" onSubmit={handleGoalSubmit}>
               <label className="grid gap-2 text-sm text-stone-700">
                 Monthly dividend target
@@ -301,13 +299,13 @@ function App() {
             </form>
           </Panel>
 
-          <Panel title="What to buy next" subtitle="Best current income efficiency based on the tickers already in your portfolio.">
+          <Panel title="What to buy next" subtitle="Shows which stock in your list gives the most dividend income for the money.">
             {recommendation ? (
               <div className="grid gap-5">
                 <div className="flex items-end justify-between">
                   <div>
                     <p className="font-mono text-xs uppercase tracking-[0.28em] text-stone-500">
-                      Suggested ticker
+                      Best stock
                     </p>
                     <h2 className="mt-2 font-heading text-4xl tracking-[-0.05em] text-stone-950">
                       {recommendation.ticker}
@@ -327,13 +325,13 @@ function App() {
                 </div>
               </div>
             ) : (
-              <EmptyState message="Add at least one dividend-paying holding to unlock a recommendation." />
+              <EmptyState message="Add at least one stock to see a suggestion." />
             )}
           </Panel>
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-          <Panel title="Portfolio chart" subtitle="Monthly income snapshots stored in Supabase.">
+          <Panel title="Income chart" subtitle="Shows your monthly dividend income over time.">
             <div className="h-[320px] w-full">
               {chartPoints.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -378,12 +376,12 @@ function App() {
                   </AreaChart>
                 </ResponsiveContainer>
               ) : (
-                <EmptyState message="Your chart will appear after your first dashboard snapshot is saved." />
+                <EmptyState message="Your chart will appear after your first saved update." />
               )}
             </div>
           </Panel>
 
-          <Panel title="Projection" subtitle="Time-to-goal estimate based on your weekly contribution and best current yield.">
+          <Panel title="Projection" subtitle="Shows how long it may take to reach your goal.">
             {projection ? (
               <div className="grid gap-3">
                 <MetricRow
@@ -395,7 +393,7 @@ function App() {
                   value={
                     projection.estimated_weeks_to_goal !== null
                       ? String(projection.estimated_weeks_to_goal)
-                      : 'Need a weekly rate + dividend pick'
+                      : 'Add a weekly amount and stock'
                   }
                 />
                 <MetricRow
@@ -403,7 +401,7 @@ function App() {
                   value={
                     projection.estimated_months_to_goal !== null
                       ? String(projection.estimated_months_to_goal)
-                      : 'Need a weekly rate + dividend pick'
+                      : 'Add a weekly amount and stock'
                   }
                 />
                 <MetricRow
@@ -420,19 +418,19 @@ function App() {
                 />
               </div>
             ) : (
-              <EmptyState message="Projection data will appear once the dashboard loads." />
+              <EmptyState message="Projection details will show here." />
             )}
           </Panel>
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-          <Panel title="Add holding" subtitle="Enter a ticker and share count. Live price and dividend data are fetched automatically.">
+          <Panel title="Add stock" subtitle="Enter a stock symbol and number of shares.">
             <form className="grid gap-4 sm:grid-cols-[0.9fr_1.1fr]" onSubmit={handleHoldingSubmit}>
               <label className="grid gap-2 text-sm text-stone-700">
                 Ticker
                 <input
                   className="h-12 rounded-2xl border border-stone-200 bg-stone-50 px-4 text-base uppercase outline-none transition focus:border-emerald-700 focus:bg-white"
-                  placeholder="SCHD"
+                  placeholder="AAPL"
                   value={holdingForm.ticker}
                   onChange={(event) =>
                     setHoldingForm((current) => ({ ...current, ticker: event.target.value }))
@@ -456,12 +454,12 @@ function App() {
                 disabled={savingHolding || refreshing}
                 type="submit"
               >
-                {savingHolding ? 'Adding holding...' : 'Add holding'}
+                {savingHolding ? 'Adding stock...' : 'Add stock'}
               </button>
             </form>
           </Panel>
 
-          <Panel title="Holdings breakdown" subtitle="Each position’s market value and dividend contribution toward your monthly goal.">
+          <Panel title="Your stocks" subtitle="See how each stock adds to your dividend income.">
             {topHoldings.length > 0 ? (
               <div className="overflow-hidden rounded-[1.5rem] border border-stone-200">
                 <div className="grid grid-cols-[1.05fr_0.75fr_0.85fr_0.85fr_auto] gap-3 bg-stone-100 px-4 py-3 text-xs font-medium uppercase tracking-[0.22em] text-stone-500">
@@ -565,8 +563,8 @@ function App() {
                 </div>
               </div>
             ) : (
-              <EmptyState message="No holdings yet. Add your first dividend position to start tracking." />
-            )}
+                <EmptyState message="No stocks yet. Add your first one to get started." />
+              )}
           </Panel>
         </section>
 

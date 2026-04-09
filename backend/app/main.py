@@ -167,13 +167,8 @@ def get_dashboard() -> DashboardResponse:
 
 @app.get("/chart", response_model=list[ChartPoint])
 def get_chart() -> list[ChartPoint]:
-    dashboard = load_dashboard()
     response = get_supabase().table("dividend_history").select("*").order("month").execute()
     rows = response.data or []
-
-    if not rows and dashboard.current_monthly_income >= 0:
-        save_dividend_history(dashboard.current_monthly_income)
-        rows = get_supabase().table("dividend_history").select("*").order("month").execute().data or []
 
     return [
         ChartPoint(
