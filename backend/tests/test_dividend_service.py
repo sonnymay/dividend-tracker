@@ -92,6 +92,50 @@ class DividendServiceTests(unittest.TestCase):
         mock_table.update.assert_called_once_with({"ticker": "SCHD", "shares": 12.0})
         mock_update.eq.assert_called_once_with("id", 7)
 
+    @patch("app.main.enrich_holdings")
+    @patch("app.main.fetch_ticker_snapshot")
+    @patch("app.main.get_supabase")
+    def test_replace_holding_group_replaces_all_matching_rows(
+        self,
+        mock_get_supabase,
+        mock_fetch_ticker_snapshot,
+        mock_enrich_holdings,
+    ) -> None:
+        client = TestClient(app)
+
+        mock_fetch_ticker_snapshot.return_value = object()
+        mock_table = mock_get_supabase.return_value.table.return_value
+
+        mock_table.select.return_value.eq.return_value.execute.return_value.data = [
+            {"id": 1, "ticker": "SCHD", "shares": 10},
+            {"id": 2, "ticker": "SCHD", "shares": 5},
+        ]
+        mock_table.insert.return_value.execute.return_value.data = [
+            {"id": 9, "ticker": "VOO", "shares": 3, "created_at": datetime.now().isoformat()}
+        ]
+        mock_enrich_holdings.return_value = [
+            HoldingResponse(
+                id=9,
+                ticker="VOO",
+                shares=3,
+                price=500,
+                dividend_yield_percent=1.25,
+                annual_dividend_per_share=6.25,
+                annual_income=18.75,
+                monthly_income=1.56,
+                market_value=1500,
+                created_at=datetime.now(),
+            )
+        ]
+
+        response = client.put("/holdings/by-ticker/SCHD", json={"ticker": "voo", "shares": 3})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["ticker"], "VOO")
+        mock_fetch_ticker_snapshot.assert_called_once_with("VOO")
+        mock_table.delete.return_value.eq.assert_called_once_with("ticker", "SCHD")
+        mock_table.insert.assert_called_once_with({"ticker": "VOO", "shares": 3.0})
+
 
 if __name__ == "__main__":
     unittest.main()

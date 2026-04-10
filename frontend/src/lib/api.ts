@@ -38,12 +38,6 @@ export type Dashboard = {
   holdings: Holding[]
 }
 
-export type ChartPoint = {
-  month: string
-  total_monthly_income: number
-  created_at: string | null
-}
-
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers ?? {})
 
@@ -73,12 +67,14 @@ export const api = {
   getGoal: () => request<Goal>('/goal'),
   saveGoal: (payload: Pick<Goal, 'monthly_target' | 'weekly_investment'>) =>
     request<Goal>('/goal', { method: 'POST', body: JSON.stringify(payload) }),
-  getHoldings: () => request<Holding[]>('/holdings'),
   addHolding: (payload: { ticker: string; shares: number }) =>
     request<Holding>('/holdings', { method: 'POST', body: JSON.stringify(payload) }),
-  updateHolding: (id: number, payload: { ticker: string; shares: number }) =>
-    request<Holding>(`/holdings/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
-  deleteHolding: (id: number) => request<void>(`/holdings/${id}`, { method: 'DELETE' }),
+  updateHoldingGroup: (ticker: string, payload: { ticker: string; shares: number }) =>
+    request<Holding>(`/holdings/by-ticker/${encodeURIComponent(ticker)}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  deleteHoldingGroup: (ticker: string) =>
+    request<void>(`/holdings/by-ticker/${encodeURIComponent(ticker)}`, { method: 'DELETE' }),
   getDashboard: () => request<Dashboard>('/dashboard'),
-  getChart: () => request<ChartPoint[]>('/chart'),
 }

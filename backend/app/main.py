@@ -126,9 +126,41 @@ def update_holding(holding_id: int, payload: HoldingUpdate) -> HoldingResponse:
     return enrich_holdings(rows)[0]
 
 
+@app.put("/holdings/by-ticker/{ticker}", response_model=HoldingResponse)
+def replace_holding_group(ticker: str, payload: HoldingUpdate) -> HoldingResponse:
+    normalized_ticker = ticker.strip().upper()
+
+    try:
+        fetch_ticker_snapshot(payload.ticker)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+    supabase = get_supabase()
+    existing_rows = supabase.table("holdings").select("*").eq("ticker", normalized_ticker).execute().data or []
+
+    if not existing_rows:
+        raise HTTPException(status_code=404, detail="Holding group not found.")
+
+    supabase.table("holdings").delete().eq("ticker", normalized_ticker).execute()
+    response = supabase.table("holdings").insert({"ticker": payload.ticker, "shares": payload.shares}).execute()
+    rows = response.data or []
+
+    if not rows:
+        raise HTTPException(status_code=500, detail="Unable to replace holding group.")
+
+    return enrich_holdings(rows)[0]
+
+
 @app.delete("/holdings/{holding_id}", status_code=204, response_class=Response)
 def delete_holding(holding_id: int) -> Response:
     get_supabase().table("holdings").delete().eq("id", holding_id).execute()
+    return Response(status_code=204)
+
+
+@app.delete("/holdings/by-ticker/{ticker}", status_code=204, response_class=Response)
+def delete_holding_group(ticker: str) -> Response:
+    normalized_ticker = ticker.strip().upper()
+    get_supabase().table("holdings").delete().eq("ticker", normalized_ticker).execute()
     return Response(status_code=204)
 
 

@@ -1,15 +1,6 @@
 import { startTransition, useEffect, useState, type FormEvent, type ReactNode } from 'react'
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
 
-import { api, type ChartPoint, type Dashboard, type Holding } from './lib/api'
+import { api, type Dashboard, type Holding } from './lib/api'
 
 const currency = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -30,17 +21,26 @@ function formatPercent(value: number): string {
   return percent.format(value / 100)
 }
 
+type GroupedHolding = {
+  ticker: string
+  shares: number
+  price: number
+  dividend_yield_percent: number
+  annual_income: number
+  monthly_income: number
+  market_value: number
+}
+
 function App() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null)
   const [holdings, setHoldings] = useState<Holding[]>([])
-  const [chartPoints, setChartPoints] = useState<ChartPoint[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [savingGoal, setSavingGoal] = useState(false)
   const [savingHolding, setSavingHolding] = useState(false)
-  const [savingHoldingId, setSavingHoldingId] = useState<number | null>(null)
-  const [removingHoldingId, setRemovingHoldingId] = useState<number | null>(null)
-  const [editingHoldingId, setEditingHoldingId] = useState<number | null>(null)
+  const [savingHoldingTicker, setSavingHoldingTicker] = useState<string | null>(null)
+  const [removingHoldingTicker, setRemovingHoldingTicker] = useState<string | null>(null)
+  const [editingHoldingTicker, setEditingHoldingTicker] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [goalForm, setGoalForm] = useState({ monthly_target: '5000' })
@@ -55,19 +55,17 @@ function App() {
       setRefreshing(true)
     }
     try {
-      const [goalResponse, dashboardResponse, chartResponse] = await Promise.all([
+      const [goalResponse, dashboardResponse] = await Promise.all([
         api.getGoal(),
         api.getDashboard(),
-        api.getChart(),
       ])
 
       startTransition(() => {
         setGoalForm({
           monthly_target: goalResponse.monthly_target ? String(goalResponse.monthly_target) : '5000',
         })
-      setHoldings(dashboardResponse.holdings)
-      setDashboard(dashboardResponse)
-      setChartPoints(chartResponse)
+        setHoldings(dashboardResponse.holdings)
+        setDashboard(dashboardResponse)
       })
     } finally {
       if (options?.background) {
@@ -86,7 +84,38 @@ function App() {
       })
   }, [])
 
-  const topHoldings = [...holdings].sort((left, right) => right.monthly_income - left.monthly_income)
+  const groupedHoldings = Array.from(
+    holdings.reduce((groups, holding) => {
+      const existing = groups.get(holding.ticker)
+
+      if (existing) {
+        existing.shares += holding.shares
+        existing.annual_income += holding.annual_income
+        existing.monthly_income += holding.monthly_income
+        existing.market_value += holding.market_value
+      } else {
+        groups.set(holding.ticker, {
+          ticker: holding.ticker,
+          shares: holding.shares,
+          price: holding.price,
+          dividend_yield_percent: holding.dividend_yield_percent,
+          annual_income: holding.annual_income,
+          monthly_income: holding.monthly_income,
+          market_value: holding.market_value,
+        })
+      }
+
+      return groups
+    }, new Map<string, GroupedHolding>()),
+  )
+    .map(([, holding]) => ({
+      ...holding,
+      shares: Number(holding.shares.toFixed(4)),
+      annual_income: Number(holding.annual_income.toFixed(2)),
+      monthly_income: Number(holding.monthly_income.toFixed(2)),
+      market_value: Number(holding.market_value.toFixed(2)),
+    }))
+    .sort((left, right) => right.monthly_income - left.monthly_income)
 
   async function handleGoalSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -129,8 +158,8 @@ function App() {
     }
   }
 
-  function startEditingHolding(holding: Holding) {
-    setEditingHoldingId(holding.id)
+  function startEditingHolding(holding: GroupedHolding) {
+    setEditingHoldingTicker(holding.ticker)
     setEditingHoldingForm({
       ticker: holding.ticker,
       shares: String(holding.shares),
@@ -140,17 +169,17 @@ function App() {
   }
 
   function cancelEditingHolding() {
-    setEditingHoldingId(null)
+    setEditingHoldingTicker(null)
     setEditingHoldingForm({ ticker: '', shares: '' })
   }
 
-  async function handleEditHoldingSubmit(id: number) {
-    setSavingHoldingId(id)
+  async function handleEditHoldingSubmit(ticker: string) {
+    setSavingHoldingTicker(ticker)
     setError(null)
     setNotice(null)
 
     try {
-      await api.updateHolding(id, {
+      await api.updateHoldingGroup(ticker, {
         ticker: editingHoldingForm.ticker.trim().toUpperCase(),
         shares: Number(editingHoldingForm.shares),
       })
@@ -160,18 +189,18 @@ function App() {
     } catch (submitError: unknown) {
       setError(submitError instanceof Error ? submitError.message : 'Unable to update holding.')
     } finally {
-      setSavingHoldingId(null)
+      setSavingHoldingTicker(null)
     }
   }
 
-  async function handleDeleteHolding(id: number) {
+  async function handleDeleteHolding(ticker: string) {
     setError(null)
     setNotice(null)
-    setRemovingHoldingId(id)
+    setRemovingHoldingTicker(ticker)
 
     try {
-      await api.deleteHolding(id)
-      if (editingHoldingId === id) {
+      await api.deleteHoldingGroup(ticker)
+      if (editingHoldingTicker === ticker) {
         cancelEditingHolding()
       }
       setNotice('Holding removed.')
@@ -179,7 +208,7 @@ function App() {
     } catch (deleteError: unknown) {
       setError(deleteError instanceof Error ? deleteError.message : 'Unable to remove holding.')
     } finally {
-      setRemovingHoldingId(null)
+      setRemovingHoldingTicker(null)
     }
   }
 
@@ -209,7 +238,7 @@ function App() {
                 label="Goal progress"
                 value={monthlyTarget ? formatPercent(progressPercent) : 'Set a goal'}
               />
-              <StatCard label="Stocks" value={String(holdings.length)} />
+              <StatCard label="Stocks" value={String(groupedHoldings.length)} />
             </div>
           </div>
 
@@ -310,57 +339,7 @@ function App() {
           </Panel>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-          <Panel title="Income chart">
-            <div className="h-[320px] w-full">
-              {chartPoints.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart
-                    data={chartPoints.map((point) => ({
-                      ...point,
-                      label: new Date(point.month).toLocaleDateString('en-US', {
-                        month: 'short',
-                        year: 'numeric',
-                      }),
-                    }))}
-                  >
-                    <defs>
-                      <linearGradient id="incomeFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#266f58" stopOpacity={0.42} />
-                        <stop offset="100%" stopColor="#266f58" stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid stroke="#d7d1c7" vertical={false} />
-                    <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={10} />
-                    <YAxis
-                      tickFormatter={(value: number) => `$${value}`}
-                      tickLine={false}
-                      axisLine={false}
-                      width={64}
-                    />
-                    <Tooltip
-                      formatter={(value) => formatCurrency(Number(value ?? 0))}
-                      contentStyle={{
-                        borderRadius: '16px',
-                        borderColor: '#d6d0c4',
-                        background: '#fffdfa',
-                      }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="total_monthly_income"
-                      stroke="#18493b"
-                      strokeWidth={3}
-                      fill="url(#incomeFill)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              ) : (
-                <EmptyState message="Your chart will appear after your first saved update." />
-              )}
-            </div>
-          </Panel>
-
+        <section className="grid gap-6">
           <Panel title="Projection">
             {projection ? (
               <div className="grid gap-3">
@@ -373,7 +352,7 @@ function App() {
                   value={
                     projection.estimated_weeks_to_goal !== null
                       ? String(projection.estimated_weeks_to_goal)
-                      : 'Not available'
+                      : 'N/A'
                   }
                 />
                 <MetricRow
@@ -381,21 +360,10 @@ function App() {
                   value={
                     projection.estimated_months_to_goal !== null
                       ? String(projection.estimated_months_to_goal)
-                      : 'Not available'
+                      : 'N/A'
                   }
                 />
-                <MetricRow
-                  label="Estimated goal date"
-                  value={
-                    projection.estimated_goal_date
-                      ? new Date(projection.estimated_goal_date).toLocaleDateString('en-US', {
-                          month: 'long',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })
-                      : 'Not enough data yet'
-                  }
-                />
+                <MetricRow label="Estimated goal date" value="Not enough data yet" />
               </div>
             ) : (
               <EmptyState message="Projection details will show here." />
@@ -440,7 +408,7 @@ function App() {
           </Panel>
 
           <Panel title="Your stocks">
-            {topHoldings.length > 0 ? (
+            {groupedHoldings.length > 0 ? (
               <div className="overflow-hidden rounded-[1.5rem] border border-stone-200">
                 <div className="grid grid-cols-[1.05fr_0.75fr_0.85fr_0.85fr_auto] gap-3 bg-stone-100 px-4 py-3 text-xs font-medium uppercase tracking-[0.22em] text-stone-500">
                   <span>Ticker</span>
@@ -450,14 +418,14 @@ function App() {
                   <span />
                 </div>
                 <div className="divide-y divide-stone-200">
-                  {topHoldings.map((holding) => {
-                    const isEditing = editingHoldingId === holding.id
-                    const isSavingEdit = savingHoldingId === holding.id
-                    const isRemoving = removingHoldingId === holding.id
+                  {groupedHoldings.map((holding) => {
+                    const isEditing = editingHoldingTicker === holding.ticker
+                    const isSavingEdit = savingHoldingTicker === holding.ticker
+                    const isRemoving = removingHoldingTicker === holding.ticker
 
                     return (
                       <div
-                        key={holding.id}
+                        key={holding.ticker}
                         className="grid grid-cols-[1.05fr_0.75fr_0.85fr_0.85fr_auto] items-center gap-3 px-4 py-3 text-sm text-stone-700"
                       >
                         <div>
@@ -504,7 +472,7 @@ function App() {
                               <button
                                 className="rounded-full border border-emerald-300 px-3 py-1 text-xs text-emerald-800 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
                                 disabled={isSavingEdit || refreshing}
-                                onClick={() => handleEditHoldingSubmit(holding.id)}
+                                onClick={() => handleEditHoldingSubmit(holding.ticker)}
                                 type="button"
                               >
                                 {isSavingEdit ? 'Saving...' : 'Save'}
@@ -521,7 +489,7 @@ function App() {
                           ) : (
                             <button
                               className="rounded-full border border-stone-300 px-3 py-1 text-xs text-stone-600 transition hover:border-emerald-400 hover:text-emerald-700"
-                              disabled={refreshing || removingHoldingId !== null || savingHolding}
+                              disabled={refreshing || removingHoldingTicker !== null || savingHolding}
                               onClick={() => startEditingHolding(holding)}
                               type="button"
                             >
@@ -531,7 +499,7 @@ function App() {
                           <button
                             className="rounded-full border border-stone-300 px-3 py-1 text-xs text-stone-600 transition hover:border-rose-400 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
                             disabled={isSavingEdit || isRemoving || refreshing}
-                            onClick={() => handleDeleteHolding(holding.id)}
+                            onClick={() => handleDeleteHolding(holding.ticker)}
                             type="button"
                           >
                             {isRemoving ? 'Removing...' : 'Remove'}
