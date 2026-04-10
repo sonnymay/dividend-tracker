@@ -204,9 +204,6 @@ function App() {
               <h1 className="mt-4 max-w-xl font-heading text-4xl tracking-[-0.04em] text-stone-950 sm:text-5xl">
                 Track your stocks and dividend income.
               </h1>
-              <p className="mt-4 max-w-lg text-sm leading-6 text-stone-600 sm:text-base">
-                Add your stocks, set a monthly goal, and see your dividend progress with live data.
-              </p>
             </div>
 
             <div className="grid min-w-full gap-3 sm:grid-cols-3 lg:min-w-[28rem]">
@@ -265,7 +262,7 @@ function App() {
         ) : null}
 
         <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-          <Panel title="Goal settings" subtitle="Set your monthly dividend goal and weekly investment amount.">
+          <Panel title="Goal settings">
             <form className="grid gap-4 sm:grid-cols-2" onSubmit={handleGoalSubmit}>
               <label className="grid gap-2 text-sm text-stone-700">
                 Monthly dividend target
@@ -299,7 +296,7 @@ function App() {
             </form>
           </Panel>
 
-          <Panel title="What to buy next" subtitle="Shows which stock in your list gives the most dividend income for the money.">
+          <Panel title="What to buy next">
             {recommendation ? (
               <div className="grid gap-5">
                 <div className="flex items-end justify-between">
@@ -331,7 +328,7 @@ function App() {
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-          <Panel title="Income chart" subtitle="Shows your monthly dividend income over time.">
+          <Panel title="Income chart">
             <div className="h-[320px] w-full">
               {chartPoints.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -381,7 +378,7 @@ function App() {
             </div>
           </Panel>
 
-          <Panel title="Projection" subtitle="Shows how long it may take to reach your goal.">
+          <Panel title="Projection">
             {projection ? (
               <div className="grid gap-3">
                 <MetricRow
@@ -424,7 +421,7 @@ function App() {
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-          <Panel title="Add stock" subtitle="Enter a stock symbol and number of shares.">
+          <Panel title="Add stock">
             <form className="grid gap-4 sm:grid-cols-[0.9fr_1.1fr]" onSubmit={handleHoldingSubmit}>
               <label className="grid gap-2 text-sm text-stone-700">
                 Ticker
@@ -459,7 +456,7 @@ function App() {
             </form>
           </Panel>
 
-          <Panel title="Your stocks" subtitle="See how each stock adds to your dividend income.">
+          <Panel title="Your stocks">
             {topHoldings.length > 0 ? (
               <div className="overflow-hidden rounded-[1.5rem] border border-stone-200">
                 <div className="grid grid-cols-[1.05fr_0.75fr_0.85fr_0.85fr_auto] gap-3 bg-stone-100 px-4 py-3 text-xs font-medium uppercase tracking-[0.22em] text-stone-500">
@@ -580,12 +577,14 @@ function App() {
   )
 }
 
-function Panel(props: { title: string; subtitle: string; children: ReactNode }) {
+function Panel(props: { title: string; subtitle?: string; children: ReactNode }) {
   return (
     <section className="rounded-[2rem] border border-white/70 bg-white/75 p-6 shadow-[0_24px_70px_rgba(51,41,24,0.08)] backdrop-blur motion-safe:animate-[rise_0.8s_ease-out] sm:p-7">
       <div className="mb-5">
         <h2 className="font-heading text-2xl tracking-[-0.04em] text-stone-950">{props.title}</h2>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">{props.subtitle}</p>
+        {props.subtitle ? (
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">{props.subtitle}</p>
+        ) : null}
       </div>
       {props.children}
     </section>
