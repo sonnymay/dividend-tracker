@@ -9,7 +9,7 @@ import {
   YAxis,
 } from 'recharts'
 
-import { api, type ChartPoint, type Dashboard, type Goal, type Holding } from './lib/api'
+import { api, type ChartPoint, type Dashboard, type Holding } from './lib/api'
 
 const currency = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -31,7 +31,6 @@ function formatPercent(value: number): string {
 }
 
 function App() {
-  const [goal, setGoal] = useState<Goal>({ id: null, monthly_target: 0, weekly_investment: 0 })
   const [dashboard, setDashboard] = useState<Dashboard | null>(null)
   const [holdings, setHoldings] = useState<Holding[]>([])
   const [chartPoints, setChartPoints] = useState<ChartPoint[]>([])
@@ -44,7 +43,7 @@ function App() {
   const [editingHoldingId, setEditingHoldingId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const [goalForm, setGoalForm] = useState({ monthly_target: '5000', weekly_investment: '250' })
+  const [goalForm, setGoalForm] = useState({ monthly_target: '5000' })
   const [holdingForm, setHoldingForm] = useState({ ticker: '', shares: '' })
   const [editingHoldingForm, setEditingHoldingForm] = useState({ ticker: '', shares: '' })
 
@@ -63,14 +62,12 @@ function App() {
       ])
 
       startTransition(() => {
-        setGoal(goalResponse)
         setGoalForm({
           monthly_target: goalResponse.monthly_target ? String(goalResponse.monthly_target) : '5000',
-          weekly_investment: String(goalResponse.weekly_investment ?? 0),
         })
-        setHoldings(dashboardResponse.holdings)
-        setDashboard(dashboardResponse)
-        setChartPoints(chartResponse)
+      setHoldings(dashboardResponse.holdings)
+      setDashboard(dashboardResponse)
+      setChartPoints(chartResponse)
       })
     } finally {
       if (options?.background) {
@@ -100,7 +97,7 @@ function App() {
     try {
       await api.saveGoal({
         monthly_target: Number(goalForm.monthly_target),
-        weekly_investment: Number(goalForm.weekly_investment),
+        weekly_investment: 0,
       })
       setNotice('Goal updated.')
       await refresh({ background: true })
@@ -212,10 +209,7 @@ function App() {
                 label="Goal progress"
                 value={monthlyTarget ? formatPercent(progressPercent) : 'Set a goal'}
               />
-              <StatCard
-                label="Weekly rate"
-                value={goal.weekly_investment ? formatCurrency(goal.weekly_investment) : '$0.00'}
-              />
+              <StatCard label="Stocks" value={String(holdings.length)} />
             </div>
           </div>
 
@@ -263,7 +257,7 @@ function App() {
 
         <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
           <Panel title="Goal settings">
-            <form className="grid gap-4 sm:grid-cols-2" onSubmit={handleGoalSubmit}>
+            <form className="grid gap-4" onSubmit={handleGoalSubmit}>
               <label className="grid gap-2 text-sm text-stone-700">
                 Monthly dividend target
                 <input
@@ -272,17 +266,6 @@ function App() {
                   value={goalForm.monthly_target}
                   onChange={(event) =>
                     setGoalForm((current) => ({ ...current, monthly_target: event.target.value }))
-                  }
-                />
-              </label>
-              <label className="grid gap-2 text-sm text-stone-700">
-                Weekly investment rate
-                <input
-                  className="h-12 rounded-2xl border border-stone-200 bg-stone-50 px-4 text-base outline-none transition focus:border-emerald-700 focus:bg-white"
-                  inputMode="decimal"
-                  value={goalForm.weekly_investment}
-                  onChange={(event) =>
-                    setGoalForm((current) => ({ ...current, weekly_investment: event.target.value }))
                   }
                 />
               </label>
@@ -390,7 +373,7 @@ function App() {
                   value={
                     projection.estimated_weeks_to_goal !== null
                       ? String(projection.estimated_weeks_to_goal)
-                      : 'Add a weekly amount and stock'
+                      : 'Not available'
                   }
                 />
                 <MetricRow
@@ -398,7 +381,7 @@ function App() {
                   value={
                     projection.estimated_months_to_goal !== null
                       ? String(projection.estimated_months_to_goal)
-                      : 'Add a weekly amount and stock'
+                      : 'Not available'
                   }
                 />
                 <MetricRow
