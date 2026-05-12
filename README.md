@@ -1,40 +1,71 @@
 # Dividend Tracker
 
-A simple dividend income tracker built with:
+> Track your dividend portfolio's yield, payout history, and breakdown — without juggling five brokerage tabs.
 
-- Backend: FastAPI + yfinance + Supabase
-- Frontend: React + Vite + Tailwind CSS + Recharts
-- Deploy: Render (backend) + Vercel (frontend)
+**Live demo:** [dividend-tracker-pi-navy.vercel.app](https://dividend-tracker-pi-navy.vercel.app)
 
-## Project Structure
+---
 
-```text
-backend/   FastAPI API + Supabase schema
-frontend/  React dashboard
+## Why this exists
+
+Most portfolio dashboards bury dividend data three clicks deep, or assume you only care about share price. As a long-term dividend investor I wanted answers to three questions at a glance:
+
+- What's my forward yield across the whole portfolio?
+- When am I getting paid, and how much?
+- Which positions are actually carrying the income?
+
+Dividend Tracker exists to answer those three questions on one screen.
+
+---
+
+## Features
+
+- **Portfolio overview** — total value, cost basis, forward yield
+- **Payout history** — past distributions visualized over time
+- **Upcoming payouts** — ex-div and pay dates so you stop missing them
+- **Position breakdown** — yield, weight, and income contribution per holding
+- **Live price + dividend data** pulled from Yahoo Finance via `yfinance`
+
+---
+
+## Stack
+
+| Layer    | Tech                                       |
+|----------|--------------------------------------------|
+| Frontend | React 19, Vite, TypeScript, Recharts, Tailwind CSS v4 |
+| Backend  | FastAPI (Python), Pydantic Settings        |
+| Data     | yfinance (Yahoo Finance) + Supabase        |
+| Hosting  | Vercel (frontend) + Render (backend)       |
+
+---
+
+## Architecture
+
+```
+┌──────────────┐      ┌──────────────┐      ┌──────────────┐
+│  React + Vite │ ───▶ │   FastAPI    │ ───▶ │  yfinance    │
+│   (Vercel)    │      │   (Render)   │      │  + Supabase  │
+└──────────────┘      └──────────────┘      └──────────────┘
 ```
 
-## Local Setup
+FastAPI handles ticker lookups via `yfinance` for live price and dividend history, then persists user holdings in Supabase. Recharts renders payout history and portfolio breakdown on the client.
+
+---
+
+## Local development
 
 ### Backend
 
-1. Copy `backend/.env.example` to `backend/.env`
-2. Fill in your Supabase project values
-3. Run:
-
 ```bash
 cd backend
-python3 -m venv .venv
-source .venv/bin/activate
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+echo "SUPABASE_URL=your-url"  > .env
+echo "SUPABASE_KEY=your-key" >> .env
+uvicorn main:app --reload
 ```
 
-The API will run on `http://localhost:8000`.
-
 ### Frontend
-
-1. Copy `frontend/.env.example` to `frontend/.env`
-2. Run:
 
 ```bash
 cd frontend
@@ -42,69 +73,20 @@ npm install
 npm run dev
 ```
 
-The app will run on `http://localhost:5173`.
+---
 
-## Supabase Setup
+## Roadmap
 
-Run the SQL in [backend/supabase/schema.sql](/Users/santipapmay/Desktop/Dividend%20Tracker/backend/supabase/schema.sql) inside the Supabase SQL editor.
+- [ ] DRIP simulation (reinvested vs cash payout)
+- [ ] Dividend growth rate (1y / 3y / 5y CAGR)
+- [ ] Sector + geography breakdown
+- [ ] CSV import from broker statements
+- [ ] Dividend safety / payout ratio flags
 
-## Deploy
+---
 
-### Render
+## About
 
-Recommended for automatic deploys: create a GitHub repo and connect Render to it.
+Built by [Sonny May](https://github.com/sonnymay). Part of a portfolio of tools I build to solve problems I actually live with.
 
-Render web service settings:
-
-- Root directory: `backend`
-- Python version: handled by [backend/.python-version](/Users/santipapmay/Desktop/Dividend%20Tracker/backend/.python-version#L1)
-- Blueprint config: [render.yaml](/Users/santipapmay/Desktop/Dividend%20Tracker/render.yaml#L1)
-- If configuring manually:
-  - Runtime: `Python`
-  - Root directory: `backend`
-  - Build command: `pip install -r requirements.txt`
-  - Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-  - Health check path: `/health`
-
-Render environment variables:
-
-- `SUPABASE_URL`
-- `SUPABASE_KEY`
-- `FRONTEND_ORIGIN`
-
-`FRONTEND_ORIGIN` should be your Vercel URL, for example `https://dividend-tracker.vercel.app`.
-
-### Vercel
-
-Recommended for automatic preview + production deploys: use the same GitHub repo.
-
-Vercel project settings:
-
-- Root directory: `frontend`
-- Framework preset: `Vite`
-- Build command: `npm run build`
-- Output directory: `dist`
-- SPA rewrites: handled by [frontend/vercel.json](/Users/santipapmay/Desktop/Dividend%20Tracker/frontend/vercel.json#L1)
-
-Vercel environment variables:
-
-- `VITE_API_BASE_URL`
-
-`VITE_API_BASE_URL` should be your Render backend URL, for example `https://dividend-tracker-api.onrender.com`.
-
-## GitHub Setup
-
-Create one GitHub repository for this whole project. That gives you:
-
-- Render autodeploys for the backend from `backend/`
-- Vercel autodeploys for the frontend from `frontend/`
-- Preview deploys on every push
-- A clean path to share or keep iterating
-
-Once the repo exists, the normal flow is:
-
-1. Push this project to GitHub.
-2. Import the repo into Render and set the service root directory to `backend`, or use the included `render.yaml`.
-3. Import the same repo into Vercel and set the root directory to `frontend`.
-4. Add env vars in both platforms.
-5. Update `FRONTEND_ORIGIN` in Render after Vercel gives you the real frontend URL.
+> Not financial advice. Dividend data sourced from Yahoo Finance and may lag or contain inaccuracies — verify with your broker before making decisions.
