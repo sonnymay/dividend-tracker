@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     supabase_key: str = ""
     frontend_origin: str = "http://localhost:5173"
     anthropic_api_key: str = ""
-    anthropic_model: str = "claude-sonnet-4-5"
+    anthropic_model: str = "claude-haiku-4-5-20251001"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
