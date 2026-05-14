@@ -68,3 +68,11 @@ class ChartPoint(BaseModel):
     month: date
     total_monthly_income: float
     created_at: datetime | None = None
+
+
+class AIChatRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=1000)
+
+
+class AIChatResponse(BaseModel):
+    answer: str

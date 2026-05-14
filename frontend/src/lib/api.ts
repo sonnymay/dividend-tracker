@@ -38,6 +38,10 @@ export type Dashboard = {
   holdings: Holding[]
 }
 
+export type AIChatResponse = {
+  answer: string
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers ?? {})
 
@@ -77,4 +81,6 @@ export const api = {
   deleteHoldingGroup: (ticker: string) =>
     request<void>(`/holdings/by-ticker/${encodeURIComponent(ticker)}`, { method: 'DELETE' }),
   getDashboard: () => request<Dashboard>('/dashboard'),
+  askAI: (question: string) =>
+    request<AIChatResponse>('/ai/chat', { method: 'POST', body: JSON.stringify({ question }) }),
 }

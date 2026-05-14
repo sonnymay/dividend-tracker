@@ -1,5 +1,6 @@
 import { startTransition, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 
+import AIChat from './components/AIChat.jsx'
 import { api, type Dashboard, type Holding } from './lib/api'
 
 const currency = new Intl.NumberFormat('en-US', {
@@ -283,6 +284,8 @@ function App() {
             {notice}
           </div>
         ) : null}
+
+        <AIChat />
 
         <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
           <Panel title="Goal settings">
