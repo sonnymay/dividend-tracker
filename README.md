@@ -4,6 +4,8 @@
 
 **Live demo:** [dividend-tracker-pi-navy.vercel.app](https://dividend-tracker-pi-navy.vercel.app)
 
+Built to track a real dividend portfolio targeting $5,000/month passive income for early retirement.
+
 ---
 
 ## Why this exists
@@ -24,6 +26,7 @@ Dividend Tracker exists to answer those three questions on one screen.
 - **Payout history** — past distributions visualized over time
 - **Upcoming payouts** — ex-div and pay dates so you stop missing them
 - **Position breakdown** — yield, weight, and income contribution per holding
+- **AI Portfolio Chat** — ask retirement timing, next-buy, and goal-tracking questions grounded in your holdings
 - **Live price + dividend data** pulled from Yahoo Finance via `yfinance`
 
 ---
@@ -49,6 +52,12 @@ Dividend Tracker exists to answer those three questions on one screen.
 ```
 
 FastAPI handles ticker lookups via `yfinance` for live price and dividend history, then persists user holdings in Supabase. Recharts renders payout history and portfolio breakdown on the client.
+
+---
+
+## Screenshots
+
+<!-- Add screenshots of the dashboard, AI Portfolio Chat, and holdings table here. -->
 
 ---
 

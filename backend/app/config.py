@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_key: str = ""
     frontend_origin: str = "http://localhost:5173"
+    anthropic_api_key: str = ""
+    anthropic_model: str = "claude-haiku-4-5-20251001"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
@@ -20,4 +22,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-

@@ -5,9 +5,12 @@ from datetime import date
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.ai import answer_portfolio_question
 from app.config import get_settings
 from app.database import get_supabase
 from app.schemas import (
+    AIChatRequest,
+    AIChatResponse,
     ChartPoint,
     DashboardResponse,
     GoalCreate,
@@ -210,3 +213,15 @@ def get_chart() -> list[ChartPoint]:
         )
         for row in rows
     ]
+
+
+@app.post("/ai/chat", response_model=AIChatResponse)
+def chat_with_portfolio(payload: AIChatRequest) -> AIChatResponse:
+    try:
+        answer = answer_portfolio_question(payload.question)
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=f"AI chat failed: {error}") from error
+
+    return AIChatResponse(answer=answer)
