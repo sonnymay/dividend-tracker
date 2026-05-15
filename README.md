@@ -57,7 +57,14 @@ FastAPI handles ticker lookups via `yfinance` for live price and dividend histor
 
 ## Screenshots
 
-<!-- Add screenshots of the dashboard, AI Portfolio Chat, and holdings table here. -->
+### Dashboard View
+![Dashboard with AI Portfolio Chat visible](frontend/public/screenshots/01-dashboard-view.png)
+
+### AI Portfolio Chat
+![AI Chat starter chips](frontend/public/screenshots/02-ai-chat-visible.png)
+
+### AI Response — "When can I retire?"
+![AI response grounded in live portfolio data](frontend/public/screenshots/03-ai-response.png)
 
 ---
 
