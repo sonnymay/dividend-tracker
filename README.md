@@ -1,10 +1,30 @@
 # Dividend Tracker
 
+[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688.svg)](https://fastapi.tiangolo.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Live Demo](https://img.shields.io/badge/demo-dividend--tracker.vercel.app-brightgreen)](https://dividend-tracker-pi-navy.vercel.app)
+
 > Track your dividend portfolio's yield, payout history, and breakdown — without juggling five brokerage tabs.
 
-**Live demo:** [dividend-tracker-pi-navy.vercel.app](https://dividend-tracker-pi-navy.vercel.app)
+**🔗 Live demo:** [dividend-tracker-pi-navy.vercel.app](https://dividend-tracker-pi-navy.vercel.app)
 
-Built to track a real dividend portfolio targeting $5,000/month passive income for early retirement.
+Built to track a real dividend portfolio targeting **$5,000/month passive income** for early retirement.
+
+---
+
+## Table of contents
+
+- [Why this exists](#why-this-exists)
+- [Features](#features)
+- [Stack](#stack)
+- [Architecture](#architecture)
+- [Screenshots](#screenshots)
+- [Local development](#local-development)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [Disclaimer](#disclaimer)
+- [License](#license)
 
 ---
 
@@ -12,9 +32,9 @@ Built to track a real dividend portfolio targeting $5,000/month passive income f
 
 Most portfolio dashboards bury dividend data three clicks deep, or assume you only care about share price. As a long-term dividend investor I wanted answers to three questions at a glance:
 
-- What's my forward yield across the whole portfolio?
-- When am I getting paid, and how much?
-- Which positions are actually carrying the income?
+- **What's my forward yield** across the whole portfolio?
+- **When am I getting paid, and how much?**
+- **Which positions are actually carrying the income?**
 
 Dividend Tracker exists to answer those three questions on one screen.
 
@@ -22,33 +42,33 @@ Dividend Tracker exists to answer those three questions on one screen.
 
 ## Features
 
-- **Portfolio overview** — total value, cost basis, forward yield
-- **Payout history** — past distributions visualized over time
-- **Upcoming payouts** — ex-div and pay dates so you stop missing them
-- **Position breakdown** — yield, weight, and income contribution per holding
-- **AI Portfolio Chat** — ask retirement timing, next-buy, and goal-tracking questions grounded in your holdings
-- **Live price + dividend data** pulled from Yahoo Finance via `yfinance`
+- 📊 **Portfolio overview** — total value, cost basis, forward yield
+- 📅 **Payout history** — past distributions visualized over time
+- 🔔 **Upcoming payouts** — ex-div and pay dates so you stop missing them
+- 🥧 **Position breakdown** — yield, weight, and income contribution per holding
+- 🤖 **AI Portfolio Chat** — ask retirement-timing, next-buy, and goal-tracking questions grounded in your holdings
+- 📡 **Live price + dividend data** pulled from Yahoo Finance via `yfinance`
 
 ---
 
 ## Stack
 
-| Layer    | Tech                                       |
-|----------|--------------------------------------------|
+| Layer    | Tech                                                  |
+|----------|-------------------------------------------------------|
 | Frontend | React 19, Vite, TypeScript, Recharts, Tailwind CSS v4 |
-| Backend  | FastAPI (Python), Pydantic Settings        |
-| Data     | yfinance (Yahoo Finance) + Supabase        |
-| Hosting  | Vercel (frontend) + Render (backend)       |
+| Backend  | FastAPI (Python 3.11+), Pydantic Settings             |
+| Data     | yfinance (Yahoo Finance) · Supabase                   |
+| Hosting  | Vercel (frontend) · Render (backend)                  |
 
 ---
 
 ## Architecture
 
 ```
-┌──────────────┐      ┌──────────────┐      ┌──────────────┐
-│  React + Vite │ ───▶ │   FastAPI    │ ───▶ │  yfinance    │
+┌───────────────┐      ┌──────────────┐      ┌──────────────┐
+│  React + Vite │ ───▶ │   FastAPI    │ ───▶ │   yfinance   │
 │   (Vercel)    │      │   (Render)   │      │  + Supabase  │
-└──────────────┘      └──────────────┘      └──────────────┘
+└───────────────┘      └──────────────┘      └──────────────┘
 ```
 
 FastAPI handles ticker lookups via `yfinance` for live price and dividend history, then persists user holdings in Supabase. Recharts renders payout history and portfolio breakdown on the client.
@@ -57,18 +77,24 @@ FastAPI handles ticker lookups via `yfinance` for live price and dividend histor
 
 ## Screenshots
 
-### Dashboard View
+### Dashboard view
 ![Dashboard with AI Portfolio Chat visible](frontend/public/screenshots/01-dashboard-view.png)
 
 ### AI Portfolio Chat
 ![AI Chat starter chips](frontend/public/screenshots/02-ai-chat-visible.png)
 
-### AI Response — "When can I retire?"
+### AI response — "When can I retire?"
 ![AI response grounded in live portfolio data](frontend/public/screenshots/03-ai-response.png)
 
 ---
 
 ## Local development
+
+### Prerequisites
+
+- Python 3.11+
+- Node.js 20+
+- A Supabase project (free tier is fine)
 
 ### Backend
 
@@ -76,10 +102,11 @@ FastAPI handles ticker lookups via `yfinance` for live price and dividend histor
 cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-echo "SUPABASE_URL=your-url"  > .env
-echo "SUPABASE_KEY=your-key" >> .env
+cp .env.example .env   # then fill in SUPABASE_URL and SUPABASE_KEY
 uvicorn main:app --reload
 ```
+
+API runs at `http://localhost:8000`. Interactive docs at `/docs`.
 
 ### Frontend
 
@@ -88,6 +115,8 @@ cd frontend
 npm install
 npm run dev
 ```
+
+App runs at `http://localhost:5173`.
 
 ---
 
@@ -98,11 +127,23 @@ npm run dev
 - [ ] Sector + geography breakdown
 - [ ] CSV import from broker statements
 - [ ] Dividend safety / payout ratio flags
+- [ ] Tests + CI (GitHub Actions)
+- [ ] Publish backend as a PyPI package
 
 ---
 
-## About
+## Contributing
 
-Built by [Sonny May](https://github.com/sonnymay). Part of a portfolio of tools I build to solve problems I actually live with.
+Issues and PRs welcome — particularly around new data sources, additional chart types, or broker-import formats. Open an issue before sending large PRs.
 
-> Not financial advice. Dividend data sourced from Yahoo Finance and may lag or contain inaccuracies — verify with your broker before making decisions.
+---
+
+## Disclaimer
+
+This project is for **personal portfolio tracking and educational purposes only**. It is not financial, investment, tax, or legal advice. Dividend and price data are provided by Yahoo Finance via `yfinance` and may be delayed, incomplete, or incorrect. Do your own research and consult a licensed advisor before making investment decisions.
+
+---
+
+## License
+
+[MIT](LICENSE) © Sonny May
