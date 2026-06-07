@@ -44,6 +44,18 @@ Dividend Tracker exists to answer those three questions on one screen.
 
 - 📊 **Portfolio overview** — total value, cost basis, forward yield
 - 📅 **Payout history** — past distributions visualized over time
+- 🤖 **AI portfolio chat** — ask questions about your holdings via natural language
+- 📈 **Forward yield projections** — estimate future income based on current positions
+- 🔍 **Stock search** — add any ticker with live data from yfinance
+- 🌙 **Dark mode** — easy on the eyes for late-night portfolio reviews
+
+## Roadmap
+
+- [ ] CSV import/export for portfolio data
+- [ ] Dividend reinvestment (DRIP) calculator
+- [ ] Tax year summary and qualified vs. ordinary dividend breakdown
+- [ ] Email alerts for upcoming ex-dividend dates
+- [ ] Multi-currency support
 - 🔔 **Upcoming payouts** — ex-div and pay dates so you stop missing them
 - 🥧 **Position breakdown** — yield, weight, and income contribution per holding
 - 🤖 **AI Portfolio Chat** — ask retirement-timing, next-buy, and goal-tracking questions grounded in your holdings
