@@ -3,3 +3,5 @@ pytest
 httpx
 pytest-cov
 ruff
+mypy
+pre-commit

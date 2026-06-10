@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import Any, cast
 
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -34,14 +35,14 @@ app.add_middleware(
 )
 
 
-def list_raw_holdings() -> list[dict]:
+def list_raw_holdings() -> list[dict[str, Any]]:
     response = get_supabase().table("holdings").select("*").order("created_at").execute()
-    return response.data or []
+    return cast(list[dict[str, Any]], response.data or [])
 
 
 def get_goal_record() -> GoalResponse:
     response = get_supabase().table("goal").select("*").limit(1).execute()
-    rows = response.data or []
+    rows = cast(list[dict[str, Any]], response.data or [])
 
     if not rows:
         return GoalResponse(id=None, monthly_target=0, weekly_investment=0)
@@ -57,16 +58,20 @@ def get_goal_record() -> GoalResponse:
 def save_dividend_history(total_monthly_income: float) -> None:
     supabase = get_supabase()
     current_month = date.today().replace(day=1).isoformat()
-    existing = (
+    existing = cast(
+        list[dict[str, Any]],
         supabase.table("dividend_history")
         .select("id")
         .eq("month", current_month)
         .limit(1)
         .execute()
         .data
-        or []
+        or [],
     )
-    payload = {"month": current_month, "total_monthly_income": round(total_monthly_income, 2)}
+    payload: dict[str, Any] = {
+        "month": current_month,
+        "total_monthly_income": round(total_monthly_income, 2),
+    }
 
     if existing:
         supabase.table("dividend_history").update(payload).eq("id", existing[0]["id"]).execute()
@@ -105,7 +110,7 @@ def create_holding(payload: HoldingCreate) -> HoldingResponse:
         .insert({"ticker": payload.ticker, "shares": payload.shares})
         .execute()
     )
-    rows = response.data or []
+    rows = cast(list[dict[str, Any]], response.data or [])
 
     if not rows:
         raise HTTPException(status_code=500, detail="Unable to save holding.")
@@ -127,7 +132,7 @@ def update_holding(holding_id: int, payload: HoldingUpdate) -> HoldingResponse:
         .eq("id", holding_id)
         .execute()
     )
-    rows = response.data or []
+    rows = cast(list[dict[str, Any]], response.data or [])
 
     if not rows:
         raise HTTPException(status_code=404, detail="Holding not found.")
@@ -145,8 +150,9 @@ def replace_holding_group(ticker: str, payload: HoldingUpdate) -> HoldingRespons
         raise HTTPException(status_code=400, detail=str(error)) from error
 
     supabase = get_supabase()
-    existing_rows = (
-        supabase.table("holdings").select("*").eq("ticker", normalized_ticker).execute().data or []
+    existing_rows = cast(
+        list[dict[str, Any]],
+        supabase.table("holdings").select("*").eq("ticker", normalized_ticker).execute().data or [],
     )
 
     if not existing_rows:
@@ -158,7 +164,7 @@ def replace_holding_group(ticker: str, payload: HoldingUpdate) -> HoldingRespons
         .insert({"ticker": payload.ticker, "shares": payload.shares})
         .execute()
     )
-    rows = response.data or []
+    rows = cast(list[dict[str, Any]], response.data or [])
 
     if not rows:
         raise HTTPException(status_code=500, detail="Unable to replace holding group.")
@@ -198,7 +204,7 @@ def save_goal(payload: GoalCreate) -> GoalResponse:
         )
         .execute()
     )
-    rows = response.data or []
+    rows = cast(list[dict[str, Any]], response.data or [])
 
     if not rows:
         raise HTTPException(status_code=500, detail="Unable to save goal.")
@@ -219,7 +225,7 @@ def get_dashboard() -> DashboardResponse:
 @app.get("/chart", response_model=list[ChartPoint])
 def get_chart() -> list[ChartPoint]:
     response = get_supabase().table("dividend_history").select("*").order("month").execute()
-    rows = response.data or []
+    rows = cast(list[dict[str, Any]], response.data or [])
 
     return [
         ChartPoint(

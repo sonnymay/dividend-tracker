@@ -21,4 +21,3 @@ create table if not exists dividend_history (
 insert into goal (id, monthly_target, weekly_investment)
 values (1, 0, 0)
 on conflict (id) do nothing;
-

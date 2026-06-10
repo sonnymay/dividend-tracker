@@ -113,7 +113,8 @@ FastAPI handles ticker lookups via `yfinance` for live price and dividend histor
 ```bash
 cd backend
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
+pre-commit install
 cp .env.example .env   # then fill in SUPABASE_URL and SUPABASE_KEY
 uvicorn main:app --reload
 ```

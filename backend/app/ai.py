@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from functools import lru_cache
-from typing import Any
+from typing import Any, cast
 
 from anthropic import Anthropic
 
@@ -14,7 +14,7 @@ from app.services.dividend_service import build_dashboard, enrich_holdings
 
 def _get_goal_record() -> GoalResponse:
     response = get_supabase().table("goal").select("*").limit(1).execute()
-    rows = response.data or []
+    rows = cast(list[dict[str, Any]], response.data or [])
 
     if not rows:
         return GoalResponse(id=None, monthly_target=0, weekly_investment=0)
@@ -29,7 +29,8 @@ def _get_goal_record() -> GoalResponse:
 
 def _portfolio_context() -> dict[str, Any]:
     holdings_response = get_supabase().table("holdings").select("*").order("created_at").execute()
-    holdings = enrich_holdings(holdings_response.data or [])
+    raw_holdings = cast(list[dict[str, Any]], holdings_response.data or [])
+    holdings = enrich_holdings(raw_holdings)
     dashboard = build_dashboard(holdings, _get_goal_record())
 
     total_market_value = round(sum(holding.market_value for holding in holdings), 2)
@@ -108,5 +109,7 @@ def answer_portfolio_question(question: str) -> str:
     )
 
     return "".join(
-        block.text for block in message.content if getattr(block, "type", None) == "text"
+        str(getattr(block, "text", ""))
+        for block in message.content
+        if getattr(block, "type", None) == "text"
     ).strip()
