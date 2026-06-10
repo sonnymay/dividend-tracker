@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from app.main import app
+from app.main import app, save_dividend_history
 from app.schemas import HoldingResponse
 
 
@@ -72,6 +72,39 @@ class CreateHoldingTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("Unknown ticker", response.json()["detail"])
+
+
+class ListHoldingTests(unittest.TestCase):
+    @patch("app.main.enrich_holdings")
+    @patch("app.main.list_raw_holdings")
+    def test_get_holdings_returns_enriched_holdings(
+        self,
+        mock_list_raw_holdings,
+        mock_enrich_holdings,
+    ) -> None:
+        client = TestClient(app)
+        raw_holdings = [{"id": 1, "ticker": "VYM", "shares": 10}]
+        mock_list_raw_holdings.return_value = raw_holdings
+        mock_enrich_holdings.return_value = [
+            HoldingResponse(
+                id=1,
+                ticker="VYM",
+                shares=10,
+                price=120.0,
+                dividend_yield_percent=3.2,
+                annual_dividend_per_share=3.84,
+                annual_income=38.4,
+                monthly_income=3.2,
+                market_value=1200.0,
+                created_at=datetime.now(),
+            )
+        ]
+
+        response = client.get("/holdings")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()[0]["ticker"], "VYM")
+        mock_enrich_holdings.assert_called_once_with(raw_holdings)
 
 
 class ReplaceHoldingGroupTests(unittest.TestCase):
@@ -214,6 +247,61 @@ class ChartTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), [])
+
+
+class DividendHistoryTests(unittest.TestCase):
+    @patch("app.main.get_supabase")
+    def test_save_dividend_history_inserts_when_month_is_missing(self, mock_get_supabase) -> None:
+        mock_table = mock_get_supabase.return_value.table.return_value
+        mock_table.select.return_value.eq.return_value.limit.return_value.execute.return_value.data = []
+
+        save_dividend_history(12.345)
+
+        mock_table.insert.assert_called_once()
+        self.assertEqual(mock_table.insert.call_args.args[0]["total_monthly_income"], 12.35)
+
+    @patch("app.main.get_supabase")
+    def test_save_dividend_history_updates_existing_month(self, mock_get_supabase) -> None:
+        mock_table = mock_get_supabase.return_value.table.return_value
+        mock_table.select.return_value.eq.return_value.limit.return_value.execute.return_value.data = [{"id": 7}]
+
+        save_dividend_history(8.0)
+
+        mock_table.update.assert_called_once()
+        mock_table.update.return_value.eq.assert_called_once_with("id", 7)
+
+
+class AIChatTests(unittest.TestCase):
+    @patch("app.main.answer_portfolio_question")
+    def test_ai_chat_returns_answer(self, mock_answer_portfolio_question) -> None:
+        client = TestClient(app)
+        mock_answer_portfolio_question.return_value = "Buy more SCHD carefully."
+
+        response = client.post("/ai/chat", json={"question": "What should I buy next?"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"answer": "Buy more SCHD carefully."})
+        mock_answer_portfolio_question.assert_called_once_with("What should I buy next?")
+
+    @patch("app.main.answer_portfolio_question")
+    def test_ai_chat_returns_503_for_runtime_error(self, mock_answer_portfolio_question) -> None:
+        client = TestClient(app)
+        mock_answer_portfolio_question.side_effect = RuntimeError("ANTHROPIC_API_KEY is not configured.")
+
+        response = client.post("/ai/chat", json={"question": "Can you help?"})
+
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("ANTHROPIC_API_KEY", response.json()["detail"])
+
+    @patch("app.main.answer_portfolio_question")
+    def test_ai_chat_returns_500_for_unexpected_error(self, mock_answer_portfolio_question) -> None:
+        client = TestClient(app)
+        mock_answer_portfolio_question.side_effect = ValueError("boom")
+
+        response = client.post("/ai/chat", json={"question": "Can you help?"})
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.json()["detail"], "AI chat failed: boom")
 
 
 if __name__ == "__main__":
