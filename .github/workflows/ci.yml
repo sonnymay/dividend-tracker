@@ -20,4 +20,4 @@ jobs:
       - name: Run tests
         run: |
           cd backend
-          pytest -v
+          pytest --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=70 -v
