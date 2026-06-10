@@ -1,8 +1,7 @@
 from functools import lru_cache
 
-from supabase import Client, create_client
-
 from app.config import get_settings
+from supabase import Client, create_client
 
 
 @lru_cache
@@ -13,4 +12,3 @@ def get_supabase() -> Client:
         raise RuntimeError("SUPABASE_URL and SUPABASE_KEY must be configured.")
 
     return create_client(settings.supabase_url, settings.supabase_key)
-

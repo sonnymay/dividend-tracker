@@ -225,8 +225,16 @@ class ChartTests(unittest.TestCase):
     def test_get_chart_returns_sorted_chart_points(self, mock_get_supabase) -> None:
         client = TestClient(app)
         mock_get_supabase.return_value.table.return_value.select.return_value.order.return_value.execute.return_value.data = [
-            {"month": "2025-01-01", "total_monthly_income": 320.50, "created_at": "2025-01-31T12:00:00"},
-            {"month": "2025-02-01", "total_monthly_income": 340.75, "created_at": "2025-02-28T12:00:00"},
+            {
+                "month": "2025-01-01",
+                "total_monthly_income": 320.50,
+                "created_at": "2025-01-31T12:00:00",
+            },
+            {
+                "month": "2025-02-01",
+                "total_monthly_income": 340.75,
+                "created_at": "2025-02-28T12:00:00",
+            },
         ]
 
         response = client.get("/chart")
@@ -263,7 +271,9 @@ class DividendHistoryTests(unittest.TestCase):
     @patch("app.main.get_supabase")
     def test_save_dividend_history_updates_existing_month(self, mock_get_supabase) -> None:
         mock_table = mock_get_supabase.return_value.table.return_value
-        mock_table.select.return_value.eq.return_value.limit.return_value.execute.return_value.data = [{"id": 7}]
+        mock_table.select.return_value.eq.return_value.limit.return_value.execute.return_value.data = [
+            {"id": 7}
+        ]
 
         save_dividend_history(8.0)
 
@@ -286,7 +296,9 @@ class AIChatTests(unittest.TestCase):
     @patch("app.main.answer_portfolio_question")
     def test_ai_chat_returns_503_for_runtime_error(self, mock_answer_portfolio_question) -> None:
         client = TestClient(app)
-        mock_answer_portfolio_question.side_effect = RuntimeError("ANTHROPIC_API_KEY is not configured.")
+        mock_answer_portfolio_question.side_effect = RuntimeError(
+            "ANTHROPIC_API_KEY is not configured."
+        )
 
         response = client.post("/ai/chat", json={"question": "Can you help?"})
 

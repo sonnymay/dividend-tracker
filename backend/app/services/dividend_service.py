@@ -45,7 +45,9 @@ def _annual_dividend_from_history(stock: yf.Ticker) -> float:
     return trailing_total
 
 
-def normalize_dividend_yield_percent(raw_yield: float | None, price: float, annual_dividend_per_share: float) -> float:
+def normalize_dividend_yield_percent(
+    raw_yield: float | None, price: float, annual_dividend_per_share: float
+) -> float:
     if raw_yield is None:
         return round((annual_dividend_per_share / price) * 100, 4) if price else 0.0
 
@@ -149,7 +151,9 @@ def build_dashboard(holdings: list[HoldingResponse], goal: GoalResponse) -> Dash
         if holding.price <= 0:
             continue
 
-        monthly_income_per_dollar = holding.monthly_income / holding.market_value if holding.market_value else 0.0
+        monthly_income_per_dollar = (
+            holding.monthly_income / holding.market_value if holding.market_value else 0.0
+        )
         if monthly_income_per_dollar > best_income_per_dollar:
             best_income_per_dollar = monthly_income_per_dollar
             recommendation = Recommendation(
@@ -172,7 +176,9 @@ def build_dashboard(holdings: list[HoldingResponse], goal: GoalResponse) -> Dash
         and recommendation is not None
         and recommendation.monthly_income_per_dollar > 0
     ):
-        monthly_income_added_per_week = goal.weekly_investment * recommendation.monthly_income_per_dollar
+        monthly_income_added_per_week = (
+            goal.weekly_investment * recommendation.monthly_income_per_dollar
+        )
         estimated_weeks_to_goal = round(remaining_monthly_income / monthly_income_added_per_week, 1)
         estimated_months_to_goal = round(estimated_weeks_to_goal / 4.345, 1)
         estimated_goal_date = date.today() + timedelta(days=ceil(estimated_weeks_to_goal * 7))

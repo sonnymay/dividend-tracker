@@ -50,9 +50,7 @@ def _portfolio_context() -> dict[str, Any]:
         ),
         "total_market_value": total_market_value,
         "best_income_candidate": (
-            dashboard.recommendation.model_dump()
-            if dashboard.recommendation
-            else None
+            dashboard.recommendation.model_dump() if dashboard.recommendation else None
         ),
         "holdings": [
             {
@@ -110,7 +108,5 @@ def answer_portfolio_question(question: str) -> str:
     )
 
     return "".join(
-        block.text
-        for block in message.content
-        if getattr(block, "type", None) == "text"
+        block.text for block in message.content if getattr(block, "type", None) == "text"
     ).strip()

@@ -58,7 +58,13 @@ def save_dividend_history(total_monthly_income: float) -> None:
     supabase = get_supabase()
     current_month = date.today().replace(day=1).isoformat()
     existing = (
-        supabase.table("dividend_history").select("id").eq("month", current_month).limit(1).execute().data or []
+        supabase.table("dividend_history")
+        .select("id")
+        .eq("month", current_month)
+        .limit(1)
+        .execute()
+        .data
+        or []
     )
     payload = {"month": current_month, "total_monthly_income": round(total_monthly_income, 2)}
 
@@ -139,13 +145,19 @@ def replace_holding_group(ticker: str, payload: HoldingUpdate) -> HoldingRespons
         raise HTTPException(status_code=400, detail=str(error)) from error
 
     supabase = get_supabase()
-    existing_rows = supabase.table("holdings").select("*").eq("ticker", normalized_ticker).execute().data or []
+    existing_rows = (
+        supabase.table("holdings").select("*").eq("ticker", normalized_ticker).execute().data or []
+    )
 
     if not existing_rows:
         raise HTTPException(status_code=404, detail="Holding group not found.")
 
     supabase.table("holdings").delete().eq("ticker", normalized_ticker).execute()
-    response = supabase.table("holdings").insert({"ticker": payload.ticker, "shares": payload.shares}).execute()
+    response = (
+        supabase.table("holdings")
+        .insert({"ticker": payload.ticker, "shares": payload.shares})
+        .execute()
+    )
     rows = response.data or []
 
     if not rows:
@@ -178,7 +190,11 @@ def save_goal(payload: GoalCreate) -> GoalResponse:
         get_supabase()
         .table("goal")
         .upsert(
-            {"id": 1, "monthly_target": payload.monthly_target, "weekly_investment": payload.weekly_investment}
+            {
+                "id": 1,
+                "monthly_target": payload.monthly_target,
+                "weekly_investment": payload.weekly_investment,
+            }
         )
         .execute()
     )

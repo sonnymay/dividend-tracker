@@ -11,9 +11,18 @@ from app.services.dividend_service import build_dashboard, normalize_dividend_yi
 
 class DividendServiceTests(unittest.TestCase):
     def test_normalize_dividend_yield_percent_handles_decimal_and_percent_inputs(self) -> None:
-        self.assertEqual(normalize_dividend_yield_percent(0.0344, price=30.91, annual_dividend_per_share=1.05), 3.44)
-        self.assertEqual(normalize_dividend_yield_percent(3.44, price=30.91, annual_dividend_per_share=1.05), 3.44)
-        self.assertEqual(normalize_dividend_yield_percent(None, price=30.91, annual_dividend_per_share=1.05), 3.397)
+        self.assertEqual(
+            normalize_dividend_yield_percent(0.0344, price=30.91, annual_dividend_per_share=1.05),
+            3.44,
+        )
+        self.assertEqual(
+            normalize_dividend_yield_percent(3.44, price=30.91, annual_dividend_per_share=1.05),
+            3.44,
+        )
+        self.assertEqual(
+            normalize_dividend_yield_percent(None, price=30.91, annual_dividend_per_share=1.05),
+            3.397,
+        )
 
     def test_build_dashboard_returns_progress_projection_and_recommendation(self) -> None:
         holdings = [
@@ -48,7 +57,9 @@ class DividendServiceTests(unittest.TestCase):
 
         self.assertEqual(dashboard.current_monthly_income, 10.2)
         self.assertEqual(dashboard.progress_percent, 10.2)
-        self.assertEqual(dashboard.recommendation.ticker if dashboard.recommendation else None, "SCHD")
+        self.assertEqual(
+            dashboard.recommendation.ticker if dashboard.recommendation else None, "SCHD"
+        )
         self.assertIsNotNone(dashboard.projection.estimated_weeks_to_goal)
 
     @patch("app.main.enrich_holdings")
