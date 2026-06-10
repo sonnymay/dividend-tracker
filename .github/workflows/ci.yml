@@ -65,3 +65,5 @@ jobs:
         run: |
           cd backend
           pytest --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=70 -v
+      - name: Build Docker image
+        run: docker build -t app ./backend
