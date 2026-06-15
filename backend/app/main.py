@@ -263,9 +263,9 @@ def chat_with_portfolio(payload: AIChatRequest) -> AIChatResponse:
         """Answer a natural-language question about the user's portfolio via Claude."""
         try:
                     answer = answer_portfolio_question(payload.question)
-except RuntimeError as error:
+    except RuntimeError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
-except Exception as error:
+    except Exception as error:
         raise HTTPException(status_code=500, detail=f"AI chat failed: {error}") from error
 
     return AIChatResponse(answer=answer)
