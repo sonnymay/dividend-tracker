@@ -9,6 +9,8 @@ services:
     healthCheckPath: /health
     autoDeployTrigger: commit
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_KEY
