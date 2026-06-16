@@ -14,6 +14,8 @@ const percent = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 1,
 })
 
+const DASHBOARD_UNLOCKED_KEY = 'dividend-tracker:dashboard-unlocked'
+
 function formatCurrency(value: number): string {
   return currency.format(value ?? 0)
 }
@@ -47,6 +49,13 @@ function App() {
   const [goalForm, setGoalForm] = useState({ monthly_target: '5000' })
   const [holdingForm, setHoldingForm] = useState({ ticker: '', shares: '' })
   const [editingHoldingForm, setEditingHoldingForm] = useState({ ticker: '', shares: '' })
+  const [dashboardUnlocked, setDashboardUnlocked] = useState(() => {
+    if (typeof window === 'undefined') {
+      return false
+    }
+
+    return window.localStorage.getItem(DASHBOARD_UNLOCKED_KEY) === 'true'
+  })
 
   async function refresh(options?: { preserveError?: boolean; background?: boolean }) {
     if (!options?.preserveError) {
@@ -87,7 +96,8 @@ function App() {
 
   const groupedHoldings = Array.from(
     holdings.reduce((groups, holding) => {
-      const existing = groups.get(holding.ticker)
+      const ticker = String(holding.ticker)
+      const existing = groups.get(ticker)
 
       if (existing) {
         existing.shares += holding.shares
@@ -95,8 +105,8 @@ function App() {
         existing.monthly_income += holding.monthly_income
         existing.market_value += holding.market_value
       } else {
-        groups.set(holding.ticker, {
-          ticker: holding.ticker,
+        groups.set(ticker, {
+          ticker,
           shares: holding.shares,
           price: holding.price,
           dividend_yield_percent: holding.dividend_yield_percent,
@@ -149,6 +159,8 @@ function App() {
         ticker: holdingForm.ticker.trim().toUpperCase(),
         shares: Number(holdingForm.shares),
       })
+      window.localStorage.setItem(DASHBOARD_UNLOCKED_KEY, 'true')
+      setDashboardUnlocked(true)
       setHoldingForm({ ticker: '', shares: '' })
       setNotice('Holding added.')
       await refresh({ background: true })
@@ -218,12 +230,15 @@ function App() {
   const progressPercent = dashboard?.progress_percent ?? 0
   const currentIncome = dashboard?.current_monthly_income ?? 0
   const monthlyTarget = dashboard?.monthly_target ?? 0
+  const hasHoldings = groupedHoldings.length > 0
+  const showDashboard = dashboardUnlocked && hasHoldings
+  const showEmptyState = !loading && !showDashboard
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(39,96,75,0.18),_transparent_30%),linear-gradient(180deg,_#f8f5ef_0%,_#f3efe6_55%,_#efe8dc_100%)] text-stone-900">
       <div className="mx-auto flex min-h-screen max-w-7xl flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8">
         <header className="overflow-hidden rounded-[2rem] border border-white/70 bg-white/75 p-6 shadow-[0_24px_80px_rgba(51,41,24,0.10)] backdrop-blur motion-safe:animate-[rise_0.6s_ease-out] sm:p-8">
-          <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-2xl">
               <p className="font-mono text-xs uppercase tracking-[0.3em] text-stone-500">
                 Dividend tracker
@@ -231,19 +246,76 @@ function App() {
               <h1 className="mt-4 max-w-xl font-heading text-4xl tracking-[-0.04em] text-stone-950 sm:text-5xl">
                 Track your stocks and dividend income.
               </h1>
+              <p className="mt-4 max-w-2xl text-base leading-7 text-stone-600">
+                Enter a stock ticker and the number of shares you own - we'll calculate your
+                monthly dividend income instantly.
+              </p>
             </div>
 
-            <div className="grid min-w-full gap-3 sm:grid-cols-3 lg:min-w-[28rem]">
-              <StatCard label="Monthly income" value={formatCurrency(currentIncome)} />
-              <StatCard
-                label="Goal progress"
-                value={monthlyTarget ? formatPercent(progressPercent) : 'Set a goal'}
-              />
-              <StatCard label="Stocks" value={String(groupedHoldings.length)} />
-            </div>
+            {showDashboard ? (
+              <div className="grid min-w-full gap-3 sm:grid-cols-3 lg:min-w-[28rem]">
+                <StatCard
+                  label="Monthly income"
+                  subtitle="per month from your stocks"
+                  value={formatCurrency(currentIncome)}
+                />
+                <StatCard
+                  label="Goal progress"
+                  subtitle={
+                    monthlyTarget ? `of ${formatCurrency(monthlyTarget)}/mo goal` : 'Add a monthly goal'
+                  }
+                  value={monthlyTarget ? formatPercent(progressPercent) : 'Set a goal'}
+                />
+                <StatCard
+                  label="Stocks"
+                  subtitle="positions tracked"
+                  value={String(groupedHoldings.length)}
+                />
+              </div>
+            ) : null}
           </div>
 
-          <div className="mt-8">
+          <form className="mt-8 grid gap-4 sm:grid-cols-[0.9fr_1.1fr_auto]" onSubmit={handleHoldingSubmit}>
+            <label className="grid gap-2 text-sm text-stone-700">
+              Ticker
+              <input
+                className="h-12 rounded-2xl border border-stone-200 bg-stone-50 px-4 text-base uppercase outline-none transition focus:border-emerald-700 focus:bg-white"
+                placeholder="AAPL"
+                value={holdingForm.ticker}
+                onChange={(event) =>
+                  setHoldingForm((current) => ({ ...current, ticker: event.target.value }))
+                }
+              />
+            </label>
+            <label className="grid gap-2 text-sm text-stone-700">
+              Shares
+              <input
+                className="h-12 rounded-2xl border border-stone-200 bg-stone-50 px-4 text-base outline-none transition focus:border-emerald-700 focus:bg-white"
+                inputMode="decimal"
+                placeholder="42"
+                value={holdingForm.shares}
+                onChange={(event) =>
+                  setHoldingForm((current) => ({ ...current, shares: event.target.value }))
+                }
+              />
+            </label>
+            <button
+              className="inline-flex h-12 items-center justify-center self-end rounded-2xl bg-emerald-800 px-5 font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-400 sm:min-w-32"
+              disabled={savingHolding || refreshing}
+              type="submit"
+            >
+              {savingHolding ? 'Adding stock...' : 'Add stock'}
+            </button>
+          </form>
+
+          {showEmptyState ? (
+            <p className="mt-4 text-sm text-stone-600">
+              Add your first stock above to see your dividend income.
+            </p>
+          ) : null}
+
+          {showDashboard ? (
+            <div className="mt-8">
             <div className="flex items-center justify-between text-sm text-stone-600">
               <span>{formatCurrency(currentIncome)} per month</span>
               <span>{formatCurrency(monthlyTarget)} target</span>
@@ -255,6 +327,7 @@ function App() {
               />
             </div>
           </div>
+          ) : null}
         </header>
 
         {error ? (
@@ -285,7 +358,9 @@ function App() {
           </div>
         ) : null}
 
-        <AIChat />
+        {showDashboard ? (
+          <>
+            <AIChat />
 
         <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
           <Panel title="Goal settings">
@@ -374,150 +449,114 @@ function App() {
           </Panel>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-          <Panel title="Add stock">
-            <form className="grid gap-4 sm:grid-cols-[0.9fr_1.1fr]" onSubmit={handleHoldingSubmit}>
-              <label className="grid gap-2 text-sm text-stone-700">
-                Ticker
-                <input
-                  className="h-12 rounded-2xl border border-stone-200 bg-stone-50 px-4 text-base uppercase outline-none transition focus:border-emerald-700 focus:bg-white"
-                  placeholder="AAPL"
-                  value={holdingForm.ticker}
-                  onChange={(event) =>
-                    setHoldingForm((current) => ({ ...current, ticker: event.target.value }))
-                  }
-                />
-              </label>
-              <label className="grid gap-2 text-sm text-stone-700">
-                Shares
-                <input
-                  className="h-12 rounded-2xl border border-stone-200 bg-stone-50 px-4 text-base outline-none transition focus:border-emerald-700 focus:bg-white"
-                  inputMode="decimal"
-                  placeholder="42"
-                  value={holdingForm.shares}
-                  onChange={(event) =>
-                    setHoldingForm((current) => ({ ...current, shares: event.target.value }))
-                  }
-                />
-              </label>
-              <button
-                className="col-span-full inline-flex h-12 items-center justify-center rounded-2xl bg-emerald-800 px-5 font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-400"
-                disabled={savingHolding || refreshing}
-                type="submit"
-              >
-                {savingHolding ? 'Adding stock...' : 'Add stock'}
-              </button>
-            </form>
-          </Panel>
-
+        <section className="grid gap-6">
           <Panel title="Your stocks">
-            {groupedHoldings.length > 0 ? (
-              <div className="overflow-hidden rounded-[1.5rem] border border-stone-200">
-                <div className="grid grid-cols-[1.05fr_0.75fr_0.85fr_0.85fr_auto] gap-3 bg-stone-100 px-4 py-3 text-xs font-medium uppercase tracking-[0.22em] text-stone-500">
-                  <span>Ticker</span>
-                  <span>Shares</span>
-                  <span>Price</span>
-                  <span>Monthly</span>
-                  <span />
-                </div>
-                <div className="divide-y divide-stone-200">
-                  {groupedHoldings.map((holding) => {
-                    const isEditing = editingHoldingTicker === holding.ticker
-                    const isSavingEdit = savingHoldingTicker === holding.ticker
-                    const isRemoving = removingHoldingTicker === holding.ticker
+            <div className="overflow-hidden rounded-[1.5rem] border border-stone-200">
+              <div className="grid grid-cols-[1.05fr_0.75fr_0.85fr_0.85fr_auto] gap-3 bg-stone-100 px-4 py-3 text-xs font-medium uppercase tracking-[0.22em] text-stone-500">
+                <span>Ticker</span>
+                <span>Shares</span>
+                <span>Price</span>
+                <span>Monthly</span>
+                <span />
+              </div>
+              <div className="divide-y divide-stone-200">
+                {groupedHoldings.map((holding) => {
+                  const ticker = String(holding.ticker)
+                  const isEditing = editingHoldingTicker === ticker
+                  const isSavingEdit = savingHoldingTicker === ticker
+                  const isRemoving = removingHoldingTicker === ticker
 
-                    return (
-                      <div
-                        key={holding.ticker}
-                        className="grid grid-cols-[1.05fr_0.75fr_0.85fr_0.85fr_auto] items-center gap-3 px-4 py-3 text-sm text-stone-700"
-                      >
-                        <div>
-                          {isEditing ? (
-                            <input
-                              className="h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm uppercase outline-none transition focus:border-emerald-700"
-                              value={editingHoldingForm.ticker}
-                              onChange={(event) =>
-                                setEditingHoldingForm((current) => ({
-                                  ...current,
-                                  ticker: event.target.value,
-                                }))
-                              }
-                            />
-                          ) : (
-                            <p className="font-heading text-lg text-stone-950">{holding.ticker}</p>
-                          )}
-                          <p className="text-xs text-stone-500">
-                            {holding.dividend_yield_percent.toFixed(2)}% yield
-                          </p>
-                        </div>
+                  return (
+                    <div
+                      key={ticker}
+                      className="grid grid-cols-[1.05fr_0.75fr_0.85fr_0.85fr_auto] items-center gap-3 px-4 py-3 text-sm text-stone-700"
+                    >
+                      <div>
                         {isEditing ? (
                           <input
-                            className="h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none transition focus:border-emerald-700"
-                            inputMode="decimal"
-                            value={editingHoldingForm.shares}
+                            className="h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm uppercase outline-none transition focus:border-emerald-700"
+                            value={editingHoldingForm.ticker}
                             onChange={(event) =>
                               setEditingHoldingForm((current) => ({
                                 ...current,
-                                shares: event.target.value,
+                                ticker: event.target.value,
                               }))
                             }
                           />
                         ) : (
-                          <span>{holding.shares}</span>
+                          <p className="font-heading text-lg text-stone-950">{ticker}</p>
                         )}
-                        <span>{formatCurrency(holding.price)}</span>
-                        <span className="font-medium text-emerald-900">
-                          {formatCurrency(holding.monthly_income)}
-                        </span>
-                        <div className="flex flex-wrap justify-end gap-2">
-                          {isEditing ? (
-                            <>
-                              <button
-                                className="rounded-full border border-emerald-300 px-3 py-1 text-xs text-emerald-800 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
-                                disabled={isSavingEdit || refreshing}
-                                onClick={() => handleEditHoldingSubmit(holding.ticker)}
-                                type="button"
-                              >
-                                {isSavingEdit ? 'Saving...' : 'Save'}
-                              </button>
-                              <button
-                                className="rounded-full border border-stone-300 px-3 py-1 text-xs text-stone-600 transition hover:border-stone-400 hover:bg-stone-50"
-                                disabled={isSavingEdit}
-                                onClick={cancelEditingHolding}
-                                type="button"
-                              >
-                                Cancel
-                              </button>
-                            </>
-                          ) : (
+                        <p className="text-xs text-stone-500">
+                          {holding.dividend_yield_percent.toFixed(2)}% yield
+                        </p>
+                      </div>
+                      {isEditing ? (
+                        <input
+                          className="h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none transition focus:border-emerald-700"
+                          inputMode="decimal"
+                          value={editingHoldingForm.shares}
+                          onChange={(event) =>
+                            setEditingHoldingForm((current) => ({
+                              ...current,
+                              shares: event.target.value,
+                            }))
+                          }
+                        />
+                      ) : (
+                        <span>{holding.shares}</span>
+                      )}
+                      <span>{formatCurrency(holding.price)}</span>
+                      <span className="font-medium text-emerald-900">
+                        {formatCurrency(holding.monthly_income)}
+                      </span>
+                      <div className="flex flex-wrap justify-end gap-2">
+                        {isEditing ? (
+                          <>
                             <button
-                              className="rounded-full border border-stone-300 px-3 py-1 text-xs text-stone-600 transition hover:border-emerald-400 hover:text-emerald-700"
-                              disabled={refreshing || removingHoldingTicker !== null || savingHolding}
-                              onClick={() => startEditingHolding(holding)}
+                              className="rounded-full border border-emerald-300 px-3 py-1 text-xs text-emerald-800 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+                              disabled={isSavingEdit || refreshing}
+                              onClick={() => handleEditHoldingSubmit(ticker)}
                               type="button"
                             >
-                              Edit
+                              {isSavingEdit ? 'Saving...' : 'Save'}
                             </button>
-                          )}
+                            <button
+                              className="rounded-full border border-stone-300 px-3 py-1 text-xs text-stone-600 transition hover:border-stone-400 hover:bg-stone-50"
+                              disabled={isSavingEdit}
+                              onClick={cancelEditingHolding}
+                              type="button"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
                           <button
-                            className="rounded-full border border-stone-300 px-3 py-1 text-xs text-stone-600 transition hover:border-rose-400 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
-                            disabled={isSavingEdit || isRemoving || refreshing}
-                            onClick={() => handleDeleteHolding(holding.ticker)}
+                            className="rounded-full border border-stone-300 px-3 py-1 text-xs text-stone-600 transition hover:border-emerald-400 hover:text-emerald-700"
+                            disabled={refreshing || removingHoldingTicker !== null || savingHolding}
+                            onClick={() => startEditingHolding(holding)}
                             type="button"
                           >
-                            {isRemoving ? 'Removing...' : 'Remove'}
+                            Edit
                           </button>
-                        </div>
+                        )}
+                        <button
+                          className="rounded-full border border-stone-300 px-3 py-1 text-xs text-stone-600 transition hover:border-rose-400 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          disabled={isSavingEdit || isRemoving || refreshing}
+                          onClick={() => handleDeleteHolding(ticker)}
+                          type="button"
+                        >
+                          {isRemoving ? 'Removing...' : 'Remove'}
+                        </button>
                       </div>
-                    )
-                  })}
-                </div>
+                    </div>
+                  )
+                })}
               </div>
-            ) : (
-                <EmptyState message="No stocks yet. Add your first one to get started." />
-              )}
+            </div>
           </Panel>
         </section>
+          </>
+        ) : null}
 
         <footer className="pb-4 text-center text-xs uppercase tracking-[0.24em] text-stone-500">
           {loading
@@ -545,11 +584,12 @@ function Panel(props: { title: string; subtitle?: string; children: ReactNode })
   )
 }
 
-function StatCard(props: { label: string; value: string }) {
+function StatCard(props: { label: string; subtitle?: string; value: string }) {
   return (
     <div className="rounded-[1.5rem] border border-stone-200 bg-stone-50 px-4 py-4">
       <p className="text-xs uppercase tracking-[0.22em] text-stone-500">{props.label}</p>
       <p className="mt-3 font-heading text-2xl tracking-[-0.04em] text-stone-950">{props.value}</p>
+      {props.subtitle ? <p className="mt-1 text-xs text-stone-500">{props.subtitle}</p> : null}
     </div>
   )
 }
