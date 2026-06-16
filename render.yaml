@@ -15,9 +15,13 @@ services:
         sync: false
       - key: SUPABASE_KEY
         sync: false
-      - key: ANTHROPIC_API_KEY
+      - key: OPENROUTER_API_KEY
         sync: false
-      - key: ANTHROPIC_MODEL
-        value: claude-haiku-4-5-20251001
+      - key: OPENROUTER_MODEL
+        value: openrouter/free
+      - key: OPENROUTER_SITE_URL
+        value: https://dividend-tracker-pi-navy.vercel.app
+      - key: OPENROUTER_APP_NAME
+        value: Dividend Tracker
       - key: FRONTEND_ORIGIN
         sync: false
