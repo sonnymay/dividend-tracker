@@ -117,7 +117,8 @@ def _answer_direct_fact_question(question: str, context: dict[str, Any]) -> str 
             "in monthly dividend income to reach your target."
         )
 
-    if "progress" in normalized and ("goal" in normalized or "target" in normalized):
+    asks_progress = "progress" in normalized or "tracking" in normalized
+    if asks_progress and ("goal" in normalized or "target" in normalized):
         return (
             f"You are {context['progress_percent']:.2f}% of the way to your "
             f"{_format_currency(context['monthly_target'])}/month target."
