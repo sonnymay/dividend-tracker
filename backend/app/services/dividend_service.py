@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from math import ceil
@@ -8,6 +9,8 @@ from typing import Any
 import yfinance as yf
 
 from app.schemas import DashboardResponse, GoalResponse, HoldingResponse, Projection, Recommendation
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -107,6 +110,16 @@ def fetch_ticker_snapshot(ticker: str) -> TickerSnapshot:
     )
 
 
+def empty_ticker_snapshot(ticker: str) -> TickerSnapshot:
+    """Return a safe fallback when live market data is unavailable."""
+    return TickerSnapshot(
+        ticker=ticker,
+        price=0.0,
+        annual_dividend_per_share=0.0,
+        dividend_yield_percent=0.0,
+    )
+
+
 def enrich_holdings(raw_holdings: list[dict[str, Any]]) -> list[HoldingResponse]:
     """Enrich raw Supabase holding rows with live market data from yfinance."""
     snapshots: dict[str, TickerSnapshot] = {}
@@ -116,7 +129,11 @@ def enrich_holdings(raw_holdings: list[dict[str, Any]]) -> list[HoldingResponse]
         ticker = str(holding["ticker"])
         snapshot = snapshots.get(ticker)
         if snapshot is None:
-            snapshot = fetch_ticker_snapshot(ticker)
+            try:
+                snapshot = fetch_ticker_snapshot(ticker)
+            except Exception:
+                logger.exception("Unable to fetch market data for %s.", ticker)
+                snapshot = empty_ticker_snapshot(ticker)
             snapshots[ticker] = snapshot
 
         shares = float(holding["shares"])

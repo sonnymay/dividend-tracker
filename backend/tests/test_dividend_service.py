@@ -6,7 +6,11 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.schemas import GoalResponse, HoldingResponse
-from app.services.dividend_service import build_dashboard, normalize_dividend_yield_percent
+from app.services.dividend_service import (
+    build_dashboard,
+    enrich_holdings,
+    normalize_dividend_yield_percent,
+)
 
 
 class DividendServiceTests(unittest.TestCase):
@@ -61,6 +65,28 @@ class DividendServiceTests(unittest.TestCase):
             dashboard.recommendation.ticker if dashboard.recommendation else None, "SCHD"
         )
         self.assertIsNotNone(dashboard.projection.estimated_weeks_to_goal)
+
+    @patch("app.services.dividend_service.fetch_ticker_snapshot")
+    def test_enrich_holdings_returns_zero_market_data_when_yfinance_fails(
+        self, mock_fetch_ticker_snapshot
+    ) -> None:
+        mock_fetch_ticker_snapshot.side_effect = RuntimeError("Yahoo Finance unavailable")
+        created_at = datetime.now().isoformat()
+
+        enriched = enrich_holdings(
+            [{"id": 1, "ticker": "VOO", "shares": 10, "created_at": created_at}]
+        )
+
+        self.assertEqual(len(enriched), 1)
+        holding = enriched[0]
+        self.assertEqual(holding.ticker, "VOO")
+        self.assertEqual(holding.shares, 10)
+        self.assertEqual(holding.price, 0)
+        self.assertEqual(holding.dividend_yield_percent, 0)
+        self.assertEqual(holding.annual_dividend_per_share, 0)
+        self.assertEqual(holding.annual_income, 0)
+        self.assertEqual(holding.monthly_income, 0)
+        self.assertEqual(holding.market_value, 0)
 
     @patch("app.main.enrich_holdings")
     @patch("app.main.fetch_ticker_snapshot")
