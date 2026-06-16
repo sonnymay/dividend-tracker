@@ -69,7 +69,7 @@ Dividend Tracker exists to answer those three questions on one screen.
 |----------|-------------------------------------------------------|
 | Frontend | React 19, Vite, TypeScript, Recharts, Tailwind CSS v4 |
 | Backend  | FastAPI (Python 3.11+), Pydantic Settings             |
-| Data     | yfinance (Yahoo Finance) · Supabase                   |
+| Data     | yfinance (Yahoo Finance) · Supabase · OpenRouter      |
 | Hosting  | Vercel (frontend) · Render (backend)                  |
 
 ---
@@ -83,7 +83,7 @@ Dividend Tracker exists to answer those three questions on one screen.
 └───────────────┘      └──────────────┘      └──────────────┘
 ```
 
-FastAPI handles ticker lookups via `yfinance` for live price and dividend history, then persists user holdings in Supabase. Recharts renders payout history and portfolio breakdown on the client.
+FastAPI handles ticker lookups via `yfinance` for live price and dividend history, persists user holdings in Supabase, and powers portfolio chat with OpenRouter. Recharts renders payout history and portfolio breakdown on the client.
 
 ---
 
@@ -113,6 +113,7 @@ Docker starts the API at `http://localhost:8000`. Create `backend/.env` from `ba
 - Python 3.11+
 - Node.js 20+
 - A Supabase project (free tier is fine)
+- An OpenRouter API key (free models are fine)
 
 ### Backend
 
@@ -121,13 +122,13 @@ cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
 pre-commit install
-cp .env.example .env   # then fill in SUPABASE_URL and SUPABASE_KEY
+cp .env.example .env   # then fill in SUPABASE_URL, SUPABASE_KEY, and OPENROUTER_API_KEY
 uvicorn app.main:app --reload
 ```
 
 API runs at `http://localhost:8000`. Interactive docs at `/docs`.
 
-For Render deploys, set `SUPABASE_URL` and `SUPABASE_KEY` on the backend web service.
+For Render deploys, set `SUPABASE_URL`, `SUPABASE_KEY`, and `OPENROUTER_API_KEY` on the backend web service.
 This app does not use `DATABASE_URL`. Use `/health/dependencies` to verify the backend
 can reach Supabase after deploy.
 

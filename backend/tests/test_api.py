@@ -353,13 +353,13 @@ class AIChatTests(unittest.TestCase):
     def test_ai_chat_returns_503_for_runtime_error(self, mock_answer_portfolio_question) -> None:
         client = TestClient(app)
         mock_answer_portfolio_question.side_effect = RuntimeError(
-            "ANTHROPIC_API_KEY is not configured."
+            "OPENROUTER_API_KEY is not configured."
         )
 
         response = client.post("/ai/chat", json={"question": "Can you help?"})
 
         self.assertEqual(response.status_code, 503)
-        self.assertIn("ANTHROPIC_API_KEY", response.json()["detail"])
+        self.assertIn("OPENROUTER_API_KEY", response.json()["detail"])
 
     @patch("app.main.answer_portfolio_question")
     def test_ai_chat_returns_500_for_unexpected_error(self, mock_answer_portfolio_question) -> None:

@@ -4,12 +4,14 @@ import json
 from functools import lru_cache
 from typing import Any, cast
 
-from anthropic import Anthropic
+import requests
 
 from app.config import get_settings
 from app.database import get_supabase
 from app.schemas import GoalResponse
 from app.services.dividend_service import build_dashboard, enrich_holdings
+
+OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
 def _get_goal_record() -> GoalResponse:
@@ -70,18 +72,28 @@ def _portfolio_context() -> dict[str, Any]:
 
 
 @lru_cache
-def _get_client() -> Anthropic:
+def _get_openrouter_headers() -> dict[str, str]:
     settings = get_settings()
 
-    if not settings.anthropic_api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY is not configured.")
+    if not settings.openrouter_api_key:
+        raise RuntimeError("OPENROUTER_API_KEY is not configured.")
 
-    return Anthropic(api_key=settings.anthropic_api_key)
+    headers = {
+        "Authorization": f"Bearer {settings.openrouter_api_key}",
+        "Content-Type": "application/json",
+    }
+
+    if settings.openrouter_site_url:
+        headers["HTTP-Referer"] = settings.openrouter_site_url
+
+    if settings.openrouter_app_name:
+        headers["X-Title"] = settings.openrouter_app_name
+
+    return headers
 
 
 def answer_portfolio_question(question: str) -> str:
     settings = get_settings()
-    client = _get_client()
     context = _portfolio_context()
 
     if not context["holdings"]:
@@ -102,14 +114,23 @@ def answer_portfolio_question(question: str) -> str:
         f"USER QUESTION:\n{question.strip()}"
     )
 
-    message = client.messages.create(
-        model=settings.anthropic_model,
-        max_tokens=900,
-        messages=[{"role": "user", "content": prompt}],
+    response = requests.post(
+        OPENROUTER_CHAT_COMPLETIONS_URL,
+        headers=_get_openrouter_headers(),
+        json={
+            "model": settings.openrouter_model,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 900,
+        },
+        timeout=30,
     )
+    response.raise_for_status()
 
-    return "".join(
-        str(getattr(block, "text", ""))
-        for block in message.content
-        if getattr(block, "type", None) == "text"
-    ).strip()
+    data = response.json()
+    choices = cast(list[dict[str, Any]], data.get("choices") or [])
+    content = choices[0].get("message", {}).get("content") if choices else None
+
+    if not content:
+        raise RuntimeError("OpenRouter returned an empty response.")
+
+    return str(content).strip()

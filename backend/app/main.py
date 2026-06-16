@@ -37,7 +37,7 @@ app = FastAPI(
     description=(
         "Dividend portfolio tracker API. "
         "Provides live holdings data, income projections, "
-        "payout history, and an AI portfolio chat backed by Claude."
+        "payout history, and an AI portfolio chat backed by OpenRouter."
     ),
 )
 
@@ -339,7 +339,7 @@ def get_chart() -> list[ChartPoint]:
 
 @app.post("/ai/chat", response_model=AIChatResponse, tags=["AI"])
 def chat_with_portfolio(payload: AIChatRequest) -> AIChatResponse:
-    """Answer a natural-language question about the user's portfolio via Claude."""
+    """Answer a natural-language question about the user's portfolio via OpenRouter."""
     try:
         answer = answer_portfolio_question(payload.question)
     except RuntimeError as error:
