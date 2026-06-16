@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.schemas import GoalResponse, HoldingResponse
 from app.services.dividend_service import (
+    TickerSnapshot,
     build_dashboard,
     enrich_holdings,
     normalize_dividend_yield_percent,
@@ -66,11 +67,37 @@ class DividendServiceTests(unittest.TestCase):
         )
         self.assertIsNotNone(dashboard.projection.estimated_weeks_to_goal)
 
+    @patch("app.services.dividend_service.fetch_chart_snapshot")
     @patch("app.services.dividend_service.fetch_ticker_snapshot")
-    def test_enrich_holdings_returns_zero_market_data_when_yfinance_fails(
-        self, mock_fetch_ticker_snapshot
+    def test_enrich_holdings_uses_chart_fallback_when_yfinance_fails(
+        self, mock_fetch_ticker_snapshot, mock_fetch_chart_snapshot
     ) -> None:
         mock_fetch_ticker_snapshot.side_effect = RuntimeError("Yahoo Finance unavailable")
+        mock_fetch_chart_snapshot.return_value = TickerSnapshot(
+            ticker="VOO",
+            price=700,
+            annual_dividend_per_share=6,
+            dividend_yield_percent=0.86,
+        )
+        created_at = datetime.now().isoformat()
+
+        enriched = enrich_holdings(
+            [{"id": 1, "ticker": "VOO", "shares": 10, "created_at": created_at}]
+        )
+
+        self.assertEqual(enriched[0].price, 700)
+        self.assertEqual(enriched[0].annual_dividend_per_share, 6)
+        self.assertEqual(enriched[0].annual_income, 60)
+        self.assertEqual(enriched[0].monthly_income, 5)
+        mock_fetch_chart_snapshot.assert_called_once_with("VOO")
+
+    @patch("app.services.dividend_service.fetch_chart_snapshot")
+    @patch("app.services.dividend_service.fetch_ticker_snapshot")
+    def test_enrich_holdings_returns_zero_market_data_when_yfinance_fails(
+        self, mock_fetch_ticker_snapshot, mock_fetch_chart_snapshot
+    ) -> None:
+        mock_fetch_ticker_snapshot.side_effect = RuntimeError("Yahoo Finance unavailable")
+        mock_fetch_chart_snapshot.side_effect = RuntimeError("Yahoo chart unavailable")
         created_at = datetime.now().isoformat()
 
         enriched = enrich_holdings(

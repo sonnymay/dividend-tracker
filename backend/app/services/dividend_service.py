@@ -6,11 +6,13 @@ from datetime import UTC, date, datetime, timedelta
 from math import ceil
 from typing import Any
 
+import requests
 import yfinance as yf
 
 from app.schemas import DashboardResponse, GoalResponse, HoldingResponse, Projection, Recommendation
 
 logger = logging.getLogger(__name__)
+YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
 
 
 @dataclass
@@ -110,6 +112,48 @@ def fetch_ticker_snapshot(ticker: str) -> TickerSnapshot:
     )
 
 
+def fetch_chart_snapshot(ticker: str) -> TickerSnapshot:
+    """Fetch price and trailing dividends from Yahoo's chart endpoint."""
+    response = requests.get(
+        YAHOO_CHART_URL.format(ticker=ticker),
+        params={"range": "1y", "interval": "1d", "events": "div"},
+        headers={"User-Agent": "Mozilla/5.0"},
+        timeout=10,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    results = payload.get("chart", {}).get("result") or []
+
+    if not results:
+        raise ValueError(f"Unable to find chart data for {ticker}.")
+
+    chart = results[0]
+    meta = chart.get("meta", {})
+    quotes = chart.get("indicators", {}).get("quote") or []
+    closes = quotes[0].get("close", []) if quotes else []
+    price = _first_number(meta.get("regularMarketPrice"), *(reversed(closes)))
+
+    if price is None:
+        raise ValueError(f"Unable to find chart price for {ticker}.")
+
+    dividend_events = chart.get("events", {}).get("dividends", {})
+    annual_dividend_per_share = sum(
+        float(event.get("amount", 0) or 0) for event in dividend_events.values()
+    )
+    dividend_yield_percent = normalize_dividend_yield_percent(
+        None,
+        price=price,
+        annual_dividend_per_share=annual_dividend_per_share,
+    )
+
+    return TickerSnapshot(
+        ticker=ticker,
+        price=round(price, 4),
+        annual_dividend_per_share=round(annual_dividend_per_share, 4),
+        dividend_yield_percent=dividend_yield_percent,
+    )
+
+
 def empty_ticker_snapshot(ticker: str) -> TickerSnapshot:
     """Return a safe fallback when live market data is unavailable."""
     return TickerSnapshot(
@@ -132,8 +176,12 @@ def enrich_holdings(raw_holdings: list[dict[str, Any]]) -> list[HoldingResponse]
             try:
                 snapshot = fetch_ticker_snapshot(ticker)
             except Exception:
-                logger.exception("Unable to fetch market data for %s.", ticker)
-                snapshot = empty_ticker_snapshot(ticker)
+                logger.exception("Unable to fetch yfinance market data for %s.", ticker)
+                try:
+                    snapshot = fetch_chart_snapshot(ticker)
+                except Exception:
+                    logger.exception("Unable to fetch chart market data for %s.", ticker)
+                    snapshot = empty_ticker_snapshot(ticker)
             snapshots[ticker] = snapshot
 
         shares = float(holding["shares"])
