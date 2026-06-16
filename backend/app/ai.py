@@ -92,6 +92,45 @@ def _get_openrouter_headers() -> dict[str, str]:
     return headers
 
 
+def _format_currency(value: Any) -> str:
+    return f"${float(value):,.2f}"
+
+
+def _answer_direct_fact_question(question: str, context: dict[str, Any]) -> str | None:
+    normalized = question.strip().lower()
+
+    asks_income = "income" in normalized or "dividend" in normalized
+    if asks_income and ("current monthly" in normalized or "monthly dividend" in normalized):
+        return (
+            f"Your current monthly dividend income is "
+            f"{_format_currency(context['monthly_income'])}."
+        )
+
+    if asks_income and "annual" in normalized:
+        return (
+            f"Your current annual dividend income is {_format_currency(context['annual_income'])}."
+        )
+
+    if "remaining" in normalized and "monthly" in normalized:
+        return (
+            f"You still need {_format_currency(context['remaining_monthly_income'])} "
+            "in monthly dividend income to reach your target."
+        )
+
+    if "progress" in normalized and ("goal" in normalized or "target" in normalized):
+        return (
+            f"You are {context['progress_percent']:.2f}% of the way to your "
+            f"{_format_currency(context['monthly_target'])}/month target."
+        )
+
+    if "target" in normalized and "monthly" in normalized:
+        return (
+            f"Your monthly dividend income target is {_format_currency(context['monthly_target'])}."
+        )
+
+    return None
+
+
 def answer_portfolio_question(question: str) -> str:
     settings = get_settings()
     context = _portfolio_context()
@@ -101,6 +140,10 @@ def answer_portfolio_question(question: str) -> str:
             "I do not see any holdings yet. Add dividend positions first, then I can ground "
             "retirement timing, buy-next, and monthly contribution answers in the portfolio."
         )
+
+    direct_answer = _answer_direct_fact_question(question, context)
+    if direct_answer:
+        return direct_answer
 
     prompt = (
         "You are an AI portfolio chat assistant for a dividend investor targeting "
