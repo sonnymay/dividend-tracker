@@ -192,6 +192,37 @@ class GoalTests(unittest.TestCase):
         self.assertEqual(data["weekly_investment"], 0)
 
     @patch("app.main.get_supabase")
+    def test_get_goal_returns_503_when_supabase_config_is_missing(self, mock_get_supabase) -> None:
+        client = TestClient(app)
+        mock_get_supabase.side_effect = RuntimeError(
+            "SUPABASE_URL and SUPABASE_KEY must be configured."
+        )
+
+        response = client.get("/goal")
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(
+            response.json()["detail"],
+            "SUPABASE_URL and SUPABASE_KEY must be configured in Render.",
+        )
+
+    @patch("app.main.get_supabase")
+    def test_get_goal_returns_503_when_supabase_query_fails(self, mock_get_supabase) -> None:
+        client = TestClient(app)
+        mock_get_supabase.return_value.table.return_value.select.return_value.limit.return_value.execute.side_effect = RuntimeError(
+            "database timeout"
+        )
+
+        response = client.get("/goal")
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(
+            response.json()["detail"],
+            "Portfolio database is unavailable. Check SUPABASE_URL, SUPABASE_KEY, "
+            "and Supabase table setup in Render.",
+        )
+
+    @patch("app.main.get_supabase")
     def test_save_goal_persists_and_returns_goal(self, mock_get_supabase) -> None:
         client = TestClient(app)
         mock_table = mock_get_supabase.return_value.table.return_value
@@ -255,6 +286,31 @@ class ChartTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), [])
+
+
+class DependencyHealthCheckTests(unittest.TestCase):
+    @patch("app.main.get_settings")
+    def test_dependency_healthcheck_returns_503_when_supabase_config_missing(
+        self, mock_get_settings
+    ) -> None:
+        class FakeSettings:
+            supabase_url = ""
+            supabase_key = ""
+
+        mock_get_settings.return_value = FakeSettings()
+        client = TestClient(app)
+
+        response = client.get("/health/dependencies")
+
+        self.assertEqual(response.status_code, 503)
+        data = response.json()
+        self.assertEqual(data["status"], "error")
+        self.assertFalse(data["supabase"]["configured"])
+        self.assertFalse(data["supabase"]["reachable"])
+        self.assertEqual(
+            data["supabase"]["detail"],
+            "SUPABASE_URL and SUPABASE_KEY must be configured in Render.",
+        )
 
 
 class DividendHistoryTests(unittest.TestCase):

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import date
 from typing import Any, cast
 
@@ -23,6 +24,12 @@ from app.schemas import (
 from app.services.dividend_service import build_dashboard, enrich_holdings, fetch_ticker_snapshot
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
+
+DATABASE_UNAVAILABLE_DETAIL = (
+    "Portfolio database is unavailable. Check SUPABASE_URL, SUPABASE_KEY, "
+    "and Supabase table setup in Render."
+)
 
 app = FastAPI(
     title=settings.app_name,
@@ -43,13 +50,44 @@ app.add_middleware(
 )
 
 
+def _database_unavailable(error: Exception, action: str) -> HTTPException:
+    logger.exception("Supabase %s failed.", action)
+
+    if "SUPABASE_URL and SUPABASE_KEY" in str(error):
+        detail = "SUPABASE_URL and SUPABASE_KEY must be configured in Render."
+    else:
+        detail = DATABASE_UNAVAILABLE_DETAIL
+
+    return HTTPException(status_code=503, detail=detail)
+
+
+def execute_supabase(query: Any, action: str) -> Any:
+    try:
+        return query.execute()
+    except Exception as error:
+        raise _database_unavailable(error, action) from error
+
+
+def supabase_table(name: str) -> Any:
+    try:
+        return get_supabase().table(name)
+    except Exception as error:
+        raise _database_unavailable(error, f"connect to {name}") from error
+
+
 def list_raw_holdings() -> list[dict[str, Any]]:
-    response = get_supabase().table("holdings").select("*").order("created_at").execute()
+    response = execute_supabase(
+        supabase_table("holdings").select("*").order("created_at"),
+        "list holdings",
+    )
     return cast(list[dict[str, Any]], response.data or [])
 
 
 def get_goal_record() -> GoalResponse:
-    response = get_supabase().table("goal").select("*").limit(1).execute()
+    response = execute_supabase(
+        supabase_table("goal").select("*").limit(1),
+        "load goal",
+    )
     rows = cast(list[dict[str, Any]], response.data or [])
 
     if not rows:
@@ -64,16 +102,13 @@ def get_goal_record() -> GoalResponse:
 
 
 def save_dividend_history(total_monthly_income: float) -> None:
-    supabase = get_supabase()
     current_month = date.today().replace(day=1).isoformat()
     existing = cast(
         list[dict[str, Any]],
-        supabase.table("dividend_history")
-        .select("id")
-        .eq("month", current_month)
-        .limit(1)
-        .execute()
-        .data
+        execute_supabase(
+            supabase_table("dividend_history").select("id").eq("month", current_month).limit(1),
+            "load dividend history",
+        ).data
         or [],
     )
     payload: dict[str, Any] = {
@@ -82,9 +117,15 @@ def save_dividend_history(total_monthly_income: float) -> None:
     }
 
     if existing:
-        supabase.table("dividend_history").update(payload).eq("id", existing[0]["id"]).execute()
+        execute_supabase(
+            supabase_table("dividend_history").update(payload).eq("id", existing[0]["id"]),
+            "update dividend history",
+        )
     else:
-        supabase.table("dividend_history").insert(payload).execute()
+        execute_supabase(
+            supabase_table("dividend_history").insert(payload),
+            "insert dividend history",
+        )
 
 
 def load_dashboard() -> DashboardResponse:
@@ -101,6 +142,35 @@ def healthcheck() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/health/dependencies", tags=["Meta"])
+def dependency_healthcheck(response: Response) -> dict[str, Any]:
+    """Return dependency readiness without exposing secrets."""
+    current_settings = get_settings()
+    supabase_configured = bool(current_settings.supabase_url and current_settings.supabase_key)
+    supabase_reachable = False
+    detail = None
+
+    if supabase_configured:
+        try:
+            execute_supabase(supabase_table("goal").select("id").limit(1), "healthcheck goal")
+            supabase_reachable = True
+        except HTTPException as error:
+            response.status_code = error.status_code
+            detail = error.detail
+    else:
+        response.status_code = 503
+        detail = "SUPABASE_URL and SUPABASE_KEY must be configured in Render."
+
+    return {
+        "status": "ok" if supabase_reachable else "error",
+        "supabase": {
+            "configured": supabase_configured,
+            "reachable": supabase_reachable,
+            "detail": detail,
+        },
+    }
+
+
 @app.get("/holdings", response_model=list[HoldingResponse], tags=["Holdings"])
 def get_holdings() -> list[HoldingResponse]:
     """Return all holdings enriched with live market data."""
@@ -115,11 +185,9 @@ def create_holding(payload: HoldingCreate) -> HoldingResponse:
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
-    response = (
-        get_supabase()
-        .table("holdings")
-        .insert({"ticker": payload.ticker, "shares": payload.shares})
-        .execute()
+    response = execute_supabase(
+        supabase_table("holdings").insert({"ticker": payload.ticker, "shares": payload.shares}),
+        "create holding",
     )
     rows = cast(list[dict[str, Any]], response.data or [])
 
@@ -137,12 +205,11 @@ def update_holding(holding_id: int, payload: HoldingUpdate) -> HoldingResponse:
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
-    response = (
-        get_supabase()
-        .table("holdings")
+    response = execute_supabase(
+        supabase_table("holdings")
         .update({"ticker": payload.ticker, "shares": payload.shares})
-        .eq("id", holding_id)
-        .execute()
+        .eq("id", holding_id),
+        "update holding",
     )
     rows = cast(list[dict[str, Any]], response.data or [])
 
@@ -162,20 +229,25 @@ def replace_holding_group(ticker: str, payload: HoldingUpdate) -> HoldingRespons
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
-    supabase = get_supabase()
     existing_rows = cast(
         list[dict[str, Any]],
-        supabase.table("holdings").select("*").eq("ticker", normalized_ticker).execute().data or [],
+        execute_supabase(
+            supabase_table("holdings").select("*").eq("ticker", normalized_ticker),
+            "load holding group",
+        ).data
+        or [],
     )
 
     if not existing_rows:
         raise HTTPException(status_code=404, detail="Holding group not found.")
 
-    supabase.table("holdings").delete().eq("ticker", normalized_ticker).execute()
-    response = (
-        supabase.table("holdings")
-        .insert({"ticker": payload.ticker, "shares": payload.shares})
-        .execute()
+    execute_supabase(
+        supabase_table("holdings").delete().eq("ticker", normalized_ticker),
+        "delete holding group",
+    )
+    response = execute_supabase(
+        supabase_table("holdings").insert({"ticker": payload.ticker, "shares": payload.shares}),
+        "replace holding group",
     )
     rows = cast(list[dict[str, Any]], response.data or [])
 
@@ -188,7 +260,10 @@ def replace_holding_group(ticker: str, payload: HoldingUpdate) -> HoldingRespons
 @app.delete("/holdings/{holding_id}", status_code=204, response_class=Response, tags=["Holdings"])
 def delete_holding(holding_id: int) -> Response:
     """Delete a single holding by ID."""
-    get_supabase().table("holdings").delete().eq("id", holding_id).execute()
+    execute_supabase(
+        supabase_table("holdings").delete().eq("id", holding_id),
+        "delete holding",
+    )
     return Response(status_code=204)
 
 
@@ -198,7 +273,10 @@ def delete_holding(holding_id: int) -> Response:
 def delete_holding_group(ticker: str) -> Response:
     """Delete all holdings for a given ticker symbol."""
     normalized_ticker = ticker.strip().upper()
-    get_supabase().table("holdings").delete().eq("ticker", normalized_ticker).execute()
+    execute_supabase(
+        supabase_table("holdings").delete().eq("ticker", normalized_ticker),
+        "delete holding group",
+    )
     return Response(status_code=204)
 
 
@@ -211,17 +289,15 @@ def get_goal() -> GoalResponse:
 @app.post("/goal", response_model=GoalResponse, tags=["Goal"])
 def save_goal(payload: GoalCreate) -> GoalResponse:
     """Upsert the income goal (always stored as row id=1)."""
-    response = (
-        get_supabase()
-        .table("goal")
-        .upsert(
+    response = execute_supabase(
+        supabase_table("goal").upsert(
             {
                 "id": 1,
                 "monthly_target": payload.monthly_target,
                 "weekly_investment": payload.weekly_investment,
             }
-        )
-        .execute()
+        ),
+        "save goal",
     )
     rows = cast(list[dict[str, Any]], response.data or [])
 
@@ -245,7 +321,10 @@ def get_dashboard() -> DashboardResponse:
 @app.get("/chart", response_model=list[ChartPoint], tags=["Dashboard"])
 def get_chart() -> list[ChartPoint]:
     """Return the monthly dividend history used to render the income chart."""
-    response = get_supabase().table("dividend_history").select("*").order("month").execute()
+    response = execute_supabase(
+        supabase_table("dividend_history").select("*").order("month"),
+        "load chart",
+    )
     rows = cast(list[dict[str, Any]], response.data or [])
 
     return [

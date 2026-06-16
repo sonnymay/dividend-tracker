@@ -122,10 +122,14 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
 pre-commit install
 cp .env.example .env   # then fill in SUPABASE_URL and SUPABASE_KEY
-uvicorn main:app --reload
+uvicorn app.main:app --reload
 ```
 
 API runs at `http://localhost:8000`. Interactive docs at `/docs`.
+
+For Render deploys, set `SUPABASE_URL` and `SUPABASE_KEY` on the backend web service.
+This app does not use `DATABASE_URL`. Use `/health/dependencies` to verify the backend
+can reach Supabase after deploy.
 
 ### Frontend
 
