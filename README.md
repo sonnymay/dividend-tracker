@@ -25,6 +25,7 @@ Built to track a real dividend portfolio targeting **$5,000/month passive income
 - [Contributing](#contributing)
 - [Disclaimer](#disclaimer)
 - [License](#license)
+- [Acknowledgements](#acknowledgements)
 
 ---
 
