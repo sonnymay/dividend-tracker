@@ -171,3 +171,10 @@ This project is for **personal portfolio tracking and educational purposes only*
 ## License
 
 [MIT](LICENSE) © Sonny May
+
+
+## Acknowledgements
+
+- [yfinance](https://github.com/ranaroussi/yfinance) for live price and dividend data
+- - [FastAPI](https://fastapi.tiangolo.com/) and [Recharts](https://recharts.org/) for the backend and charts
+  - - [Supabase](https://supabase.com/) and [OpenRouter](https://openrouter.ai/) for storage and the portfolio chat
