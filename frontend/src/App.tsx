@@ -244,11 +244,10 @@ function App() {
                 Dividend tracker
               </p>
               <h1 className="mt-4 max-w-xl font-heading text-4xl tracking-[-0.04em] text-stone-950 sm:text-5xl">
-                Track your stocks and dividend income.
+                How much passive income do you want per month?
               </h1>
               <p className="mt-4 max-w-2xl text-base leading-7 text-stone-600">
-                Enter a stock ticker and the number of shares you own - we'll calculate your
-                monthly dividend income instantly.
+                Add your stocks below and we'll show you how close you are.
               </p>
             </div>
 
