@@ -24,6 +24,12 @@ function formatPercent(value: number): string {
   return percent.format(value / 100)
 }
 
+function parseCurrencyInput(value: string): number {
+  const parsed = Number(value.replace(/[$,\s]/g, ''))
+
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
 type GroupedHolding = {
   ticker: string
   shares: number
@@ -46,7 +52,7 @@ function App() {
   const [editingHoldingTicker, setEditingHoldingTicker] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const [goalForm, setGoalForm] = useState({ monthly_target: '5000' })
+  const [goalForm, setGoalForm] = useState({ monthly_target: '' })
   const [holdingForm, setHoldingForm] = useState({ ticker: '', shares: '' })
   const [editingHoldingForm, setEditingHoldingForm] = useState({ ticker: '', shares: '' })
   const [dashboardUnlocked, setDashboardUnlocked] = useState(() => {
@@ -71,9 +77,13 @@ function App() {
       ])
 
       startTransition(() => {
-        setGoalForm({
-          monthly_target: goalResponse.monthly_target ? String(goalResponse.monthly_target) : '5000',
-        })
+        setGoalForm((current) => ({
+          monthly_target:
+            window.localStorage.getItem(DASHBOARD_UNLOCKED_KEY) === 'true' &&
+            goalResponse.monthly_target
+              ? String(goalResponse.monthly_target)
+              : current.monthly_target,
+        }))
         setHoldings(dashboardResponse.holdings)
         setDashboard(dashboardResponse)
       })
@@ -128,18 +138,24 @@ function App() {
     }))
     .sort((left, right) => right.monthly_income - left.monthly_income)
 
-  async function handleGoalSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  async function saveGoalFromInput() {
+    await api.saveGoal({
+      monthly_target: parseCurrencyInput(goalForm.monthly_target),
+      weekly_investment: 0,
+    })
+  }
+
+  async function handleGoalBlur() {
+    if (!showDashboard) {
+      return
+    }
+
     setSavingGoal(true)
     setError(null)
     setNotice(null)
 
     try {
-      await api.saveGoal({
-        monthly_target: Number(goalForm.monthly_target),
-        weekly_investment: 0,
-      })
-      setNotice('Goal updated.')
+      await saveGoalFromInput()
       await refresh({ background: true })
     } catch (submitError: unknown) {
       setError(submitError instanceof Error ? submitError.message : 'Unable to save goal.')
@@ -155,6 +171,7 @@ function App() {
     setNotice(null)
 
     try {
+      await saveGoalFromInput()
       await api.addHolding({
         ticker: holdingForm.ticker.trim().toUpperCase(),
         shares: Number(holdingForm.shares),
@@ -162,7 +179,7 @@ function App() {
       window.localStorage.setItem(DASHBOARD_UNLOCKED_KEY, 'true')
       setDashboardUnlocked(true)
       setHoldingForm({ ticker: '', shares: '' })
-      setNotice('Holding added.')
+      setNotice("Stock added. Here's your updated income.")
       await refresh({ background: true })
     } catch (submitError: unknown) {
       setError(submitError instanceof Error ? submitError.message : 'Unable to add holding.')
@@ -232,101 +249,80 @@ function App() {
   const monthlyTarget = dashboard?.monthly_target ?? 0
   const hasHoldings = groupedHoldings.length > 0
   const showDashboard = dashboardUnlocked && hasHoldings
-  const showEmptyState = !loading && !showDashboard
+  const remainingMonthlyIncome = Math.max(monthlyTarget - currentIncome, 0)
+  const projectionRows = projection
+    ? [
+        projection.estimated_weeks_to_goal !== null
+          ? { label: 'Estimated weeks', value: String(projection.estimated_weeks_to_goal) }
+          : null,
+        projection.estimated_months_to_goal !== null
+          ? { label: 'Estimated months', value: String(projection.estimated_months_to_goal) }
+          : null,
+        projection.estimated_goal_date
+          ? { label: 'Estimated goal date', value: projection.estimated_goal_date }
+          : null,
+      ].filter((row): row is { label: string; value: string } => row !== null)
+    : []
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(39,96,75,0.18),_transparent_30%),linear-gradient(180deg,_#f8f5ef_0%,_#f3efe6_55%,_#efe8dc_100%)] text-stone-900">
       <div className="mx-auto flex min-h-screen max-w-7xl flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8">
-        <header className="overflow-hidden rounded-[2rem] border border-white/70 bg-white/75 p-6 shadow-[0_24px_80px_rgba(51,41,24,0.10)] backdrop-blur motion-safe:animate-[rise_0.6s_ease-out] sm:p-8">
-          <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
-            <div className="max-w-2xl">
-              <p className="font-mono text-xs uppercase tracking-[0.3em] text-stone-500">
-                Dividend tracker
-              </p>
-              <h1 className="mt-4 max-w-xl font-heading text-4xl tracking-[-0.04em] text-stone-950 sm:text-5xl">
+        <header className="flex min-h-[calc(100vh-3rem)] items-center overflow-hidden rounded-[2rem] border border-white/70 bg-white/75 p-6 shadow-[0_24px_80px_rgba(51,41,24,0.10)] backdrop-blur motion-safe:animate-[rise_0.6s_ease-out] sm:p-8">
+          <div className="mx-auto grid w-full max-w-3xl gap-8">
+            <div>
+              <h1 className="max-w-xl font-heading text-4xl tracking-[-0.04em] text-stone-950 sm:text-5xl">
                 How much passive income do you want per month?
               </h1>
-              <p className="mt-4 max-w-2xl text-base leading-7 text-stone-600">
-                Add your stocks below and we'll show you how close you are.
-              </p>
             </div>
-
-            {showDashboard ? (
-              <div className="grid min-w-full gap-3 sm:grid-cols-3 lg:min-w-[28rem]">
-                <StatCard
-                  label="Monthly income"
-                  subtitle="per month from your stocks"
-                  value={formatCurrency(currentIncome)}
-                />
-                <StatCard
-                  label="Goal progress"
-                  subtitle={
-                    monthlyTarget ? `of ${formatCurrency(monthlyTarget)}/mo goal` : 'Add a monthly goal'
+            <form className="grid gap-5" onSubmit={handleHoldingSubmit}>
+              <label className="grid gap-2 text-sm text-stone-700">
+                Monthly income goal
+                <input
+                  className="h-16 rounded-2xl border border-stone-200 bg-stone-50 px-4 text-2xl outline-none transition focus:border-emerald-700 focus:bg-white"
+                  inputMode="decimal"
+                  onBlur={handleGoalBlur}
+                  placeholder="e.g. $2,000"
+                  value={goalForm.monthly_target}
+                  onChange={(event) =>
+                    setGoalForm((current) => ({ ...current, monthly_target: event.target.value }))
                   }
-                  value={monthlyTarget ? formatPercent(progressPercent) : 'Set a goal'}
                 />
-                <StatCard
-                  label="Stocks"
-                  subtitle="positions tracked"
-                  value={String(groupedHoldings.length)}
-                />
+              </label>
+
+              <div className="grid gap-4 sm:grid-cols-[0.9fr_1.1fr_auto]">
+                <label className="grid gap-2 text-sm text-stone-700">
+                  Ticker
+                  <input
+                    className="h-12 rounded-2xl border border-stone-200 bg-stone-50 px-4 text-base uppercase outline-none transition focus:border-emerald-700 focus:bg-white"
+                    placeholder="AAPL"
+                    value={holdingForm.ticker}
+                    onChange={(event) =>
+                      setHoldingForm((current) => ({ ...current, ticker: event.target.value }))
+                    }
+                  />
+                </label>
+                <label className="grid gap-2 text-sm text-stone-700">
+                  Shares
+                  <input
+                    className="h-12 rounded-2xl border border-stone-200 bg-stone-50 px-4 text-base outline-none transition focus:border-emerald-700 focus:bg-white"
+                    inputMode="decimal"
+                    placeholder="42"
+                    value={holdingForm.shares}
+                    onChange={(event) =>
+                      setHoldingForm((current) => ({ ...current, shares: event.target.value }))
+                    }
+                  />
+                </label>
+                <button
+                  className="inline-flex h-12 items-center justify-center self-end rounded-2xl bg-emerald-800 px-5 font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-400 sm:min-w-32"
+                  disabled={savingHolding || savingGoal || refreshing}
+                  type="submit"
+                >
+                  {savingHolding ? 'Adding stock...' : 'Add stock'}
+                </button>
               </div>
-            ) : null}
+            </form>
           </div>
-
-          <form className="mt-8 grid gap-4 sm:grid-cols-[0.9fr_1.1fr_auto]" onSubmit={handleHoldingSubmit}>
-            <label className="grid gap-2 text-sm text-stone-700">
-              Ticker
-              <input
-                className="h-12 rounded-2xl border border-stone-200 bg-stone-50 px-4 text-base uppercase outline-none transition focus:border-emerald-700 focus:bg-white"
-                placeholder="AAPL"
-                value={holdingForm.ticker}
-                onChange={(event) =>
-                  setHoldingForm((current) => ({ ...current, ticker: event.target.value }))
-                }
-              />
-            </label>
-            <label className="grid gap-2 text-sm text-stone-700">
-              Shares
-              <input
-                className="h-12 rounded-2xl border border-stone-200 bg-stone-50 px-4 text-base outline-none transition focus:border-emerald-700 focus:bg-white"
-                inputMode="decimal"
-                placeholder="42"
-                value={holdingForm.shares}
-                onChange={(event) =>
-                  setHoldingForm((current) => ({ ...current, shares: event.target.value }))
-                }
-              />
-            </label>
-            <button
-              className="inline-flex h-12 items-center justify-center self-end rounded-2xl bg-emerald-800 px-5 font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-400 sm:min-w-32"
-              disabled={savingHolding || refreshing}
-              type="submit"
-            >
-              {savingHolding ? 'Adding stock...' : 'Add stock'}
-            </button>
-          </form>
-
-          {showEmptyState ? (
-            <p className="mt-4 text-sm text-stone-600">
-              Add your first stock above to see your dividend income.
-            </p>
-          ) : null}
-
-          {showDashboard ? (
-            <div className="mt-8">
-            <div className="flex items-center justify-between text-sm text-stone-600">
-              <span>{formatCurrency(currentIncome)} per month</span>
-              <span>{formatCurrency(monthlyTarget)} target</span>
-            </div>
-            <div className="mt-3 h-4 overflow-hidden rounded-full bg-stone-200">
-              <div
-                className="h-full rounded-full bg-[linear-gradient(90deg,_#18493b_0%,_#2d7d62_55%,_#9fd6bd_100%)] transition-all duration-500"
-                style={{ width: `${Math.min(progressPercent, 100)}%` }}
-              />
-            </div>
-          </div>
-          ) : null}
         </header>
 
         {error ? (
@@ -359,205 +355,176 @@ function App() {
 
         {showDashboard ? (
           <>
+            <section className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
+              <Panel title="Your income">
+                <div className="grid gap-3">
+                  <MetricRow label="Current monthly income" value={formatCurrency(currentIncome)} />
+                  <MetricRow
+                    label="Progress toward goal"
+                    value={
+                      monthlyTarget
+                        ? `${formatPercent(progressPercent)} of ${formatCurrency(monthlyTarget)}/mo`
+                        : 'Set a goal'
+                    }
+                  />
+                  {monthlyTarget ? (
+                    <MetricRow
+                      label="Left to reach goal"
+                      value={`${formatCurrency(remainingMonthlyIncome)}/mo`}
+                    />
+                  ) : null}
+                </div>
+              </Panel>
+
+              <Panel title="Your stocks">
+                <div className="overflow-hidden rounded-[1.5rem] border border-stone-200">
+                  <div className="grid grid-cols-[1.05fr_0.75fr_0.85fr_0.85fr_auto] gap-3 bg-stone-100 px-4 py-3 text-xs font-medium text-stone-500">
+                    <span>Ticker</span>
+                    <span>Shares</span>
+                    <span>Price</span>
+                    <span>Monthly</span>
+                    <span />
+                  </div>
+                  <div className="divide-y divide-stone-200">
+                    {groupedHoldings.map((holding) => {
+                      const ticker = String(holding.ticker)
+                      const isEditing = editingHoldingTicker === ticker
+                      const isSavingEdit = savingHoldingTicker === ticker
+                      const isRemoving = removingHoldingTicker === ticker
+
+                      return (
+                        <div
+                          key={ticker}
+                          className="grid grid-cols-[1.05fr_0.75fr_0.85fr_0.85fr_auto] items-center gap-3 px-4 py-3 text-sm text-stone-700"
+                        >
+                          <div>
+                            {isEditing ? (
+                              <input
+                                className="h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm uppercase outline-none transition focus:border-emerald-700"
+                                value={editingHoldingForm.ticker}
+                                onChange={(event) =>
+                                  setEditingHoldingForm((current) => ({
+                                    ...current,
+                                    ticker: event.target.value,
+                                  }))
+                                }
+                              />
+                            ) : (
+                              <p className="font-heading text-lg text-stone-950">{ticker}</p>
+                            )}
+                            <p className="text-xs text-stone-500">
+                              {holding.dividend_yield_percent.toFixed(2)}% yield
+                            </p>
+                          </div>
+                          {isEditing ? (
+                            <input
+                              className="h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none transition focus:border-emerald-700"
+                              inputMode="decimal"
+                              value={editingHoldingForm.shares}
+                              onChange={(event) =>
+                                setEditingHoldingForm((current) => ({
+                                  ...current,
+                                  shares: event.target.value,
+                                }))
+                              }
+                            />
+                          ) : (
+                            <span>{holding.shares}</span>
+                          )}
+                          <span>{formatCurrency(holding.price)}</span>
+                          <span className="font-medium text-emerald-900">
+                            {formatCurrency(holding.monthly_income)}
+                          </span>
+                          <div className="flex flex-wrap justify-end gap-2">
+                            {isEditing ? (
+                              <>
+                                <button
+                                  className="rounded-full border border-emerald-300 px-3 py-1 text-xs text-emerald-800 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                  disabled={isSavingEdit || refreshing}
+                                  onClick={() => handleEditHoldingSubmit(ticker)}
+                                  type="button"
+                                >
+                                  {isSavingEdit ? 'Saving...' : 'Save'}
+                                </button>
+                                <button
+                                  className="rounded-full border border-stone-300 px-3 py-1 text-xs text-stone-600 transition hover:border-stone-400 hover:bg-stone-50"
+                                  disabled={isSavingEdit}
+                                  onClick={cancelEditingHolding}
+                                  type="button"
+                                >
+                                  Cancel
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                className="rounded-full border border-stone-300 px-3 py-1 text-xs text-stone-600 transition hover:border-emerald-400 hover:text-emerald-700"
+                                disabled={refreshing || removingHoldingTicker !== null || savingHolding}
+                                onClick={() => startEditingHolding(holding)}
+                                type="button"
+                              >
+                                Edit
+                              </button>
+                            )}
+                            <button
+                              className="rounded-full border border-stone-300 px-3 py-1 text-xs text-stone-600 transition hover:border-rose-400 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                              disabled={isSavingEdit || isRemoving || refreshing}
+                              onClick={() => handleDeleteHolding(ticker)}
+                              type="button"
+                            >
+                              {isRemoving ? 'Removing...' : 'Remove'}
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </Panel>
+            </section>
+
             <AIChat />
 
-        <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-          <Panel title="Goal settings">
-            <form className="grid gap-4" onSubmit={handleGoalSubmit}>
-              <label className="grid gap-2 text-sm text-stone-700">
-                Monthly dividend target
-                <input
-                  className="h-12 rounded-2xl border border-stone-200 bg-stone-50 px-4 text-base outline-none transition focus:border-emerald-700 focus:bg-white"
-                  inputMode="decimal"
-                  value={goalForm.monthly_target}
-                  onChange={(event) =>
-                    setGoalForm((current) => ({ ...current, monthly_target: event.target.value }))
-                  }
-                />
-              </label>
-              <button
-                className="col-span-full inline-flex h-12 items-center justify-center rounded-2xl bg-stone-950 px-5 font-medium text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-400"
-                disabled={savingGoal || refreshing}
-                type="submit"
-              >
-                {savingGoal ? 'Saving goal...' : 'Save goal'}
-              </button>
-            </form>
-          </Panel>
-
-          <Panel title="What to buy next">
-            {recommendation ? (
-              <div className="grid gap-5">
-                <div className="flex items-end justify-between">
-                  <div>
-                    <p className="font-mono text-xs uppercase tracking-[0.28em] text-stone-500">
-                      Best stock
-                    </p>
-                    <h2 className="mt-2 font-heading text-4xl tracking-[-0.05em] text-stone-950">
-                      {recommendation.ticker}
-                    </h2>
-                  </div>
-                  <p className="rounded-full bg-emerald-100 px-3 py-1 text-sm text-emerald-900">
-                    {recommendation.annual_dividend_yield_percent.toFixed(2)}% yield
-                  </p>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <MetricRow
-                    label="Monthly income per $1"
-                    value={formatCurrency(recommendation.monthly_income_per_dollar)}
-                  />
-                  <MetricRow label="Share price" value={formatCurrency(recommendation.share_price)} />
-                </div>
-              </div>
-            ) : (
-              <EmptyState message="Add at least one stock to see a suggestion." />
-            )}
-          </Panel>
-        </section>
-
-        <section className="grid gap-6">
-          <Panel title="Projection">
-            {projection ? (
-              <div className="grid gap-3">
-                <MetricRow
-                  label="Remaining monthly income"
-                  value={formatCurrency(projection.remaining_monthly_income)}
-                />
-                <MetricRow
-                  label="Estimated weeks"
-                  value={
-                    projection.estimated_weeks_to_goal !== null
-                      ? String(projection.estimated_weeks_to_goal)
-                      : 'N/A'
-                  }
-                />
-                <MetricRow
-                  label="Estimated months"
-                  value={
-                    projection.estimated_months_to_goal !== null
-                      ? String(projection.estimated_months_to_goal)
-                      : 'N/A'
-                  }
-                />
-                <MetricRow label="Estimated goal date" value="Not enough data yet" />
-              </div>
-            ) : (
-              <EmptyState message="Projection details will show here." />
-            )}
-          </Panel>
-        </section>
-
-        <section className="grid gap-6">
-          <Panel title="Your stocks">
-            <div className="overflow-hidden rounded-[1.5rem] border border-stone-200">
-              <div className="grid grid-cols-[1.05fr_0.75fr_0.85fr_0.85fr_auto] gap-3 bg-stone-100 px-4 py-3 text-xs font-medium uppercase tracking-[0.22em] text-stone-500">
-                <span>Ticker</span>
-                <span>Shares</span>
-                <span>Price</span>
-                <span>Monthly</span>
-                <span />
-              </div>
-              <div className="divide-y divide-stone-200">
-                {groupedHoldings.map((holding) => {
-                  const ticker = String(holding.ticker)
-                  const isEditing = editingHoldingTicker === ticker
-                  const isSavingEdit = savingHoldingTicker === ticker
-                  const isRemoving = removingHoldingTicker === ticker
-
-                  return (
-                    <div
-                      key={ticker}
-                      className="grid grid-cols-[1.05fr_0.75fr_0.85fr_0.85fr_auto] items-center gap-3 px-4 py-3 text-sm text-stone-700"
-                    >
-                      <div>
-                        {isEditing ? (
-                          <input
-                            className="h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm uppercase outline-none transition focus:border-emerald-700"
-                            value={editingHoldingForm.ticker}
-                            onChange={(event) =>
-                              setEditingHoldingForm((current) => ({
-                                ...current,
-                                ticker: event.target.value,
-                              }))
-                            }
-                          />
-                        ) : (
-                          <p className="font-heading text-lg text-stone-950">{ticker}</p>
-                        )}
-                        <p className="text-xs text-stone-500">
-                          {holding.dividend_yield_percent.toFixed(2)}% yield
-                        </p>
-                      </div>
-                      {isEditing ? (
-                        <input
-                          className="h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none transition focus:border-emerald-700"
-                          inputMode="decimal"
-                          value={editingHoldingForm.shares}
-                          onChange={(event) =>
-                            setEditingHoldingForm((current) => ({
-                              ...current,
-                              shares: event.target.value,
-                            }))
-                          }
-                        />
-                      ) : (
-                        <span>{holding.shares}</span>
-                      )}
-                      <span>{formatCurrency(holding.price)}</span>
-                      <span className="font-medium text-emerald-900">
-                        {formatCurrency(holding.monthly_income)}
-                      </span>
-                      <div className="flex flex-wrap justify-end gap-2">
-                        {isEditing ? (
-                          <>
-                            <button
-                              className="rounded-full border border-emerald-300 px-3 py-1 text-xs text-emerald-800 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
-                              disabled={isSavingEdit || refreshing}
-                              onClick={() => handleEditHoldingSubmit(ticker)}
-                              type="button"
-                            >
-                              {isSavingEdit ? 'Saving...' : 'Save'}
-                            </button>
-                            <button
-                              className="rounded-full border border-stone-300 px-3 py-1 text-xs text-stone-600 transition hover:border-stone-400 hover:bg-stone-50"
-                              disabled={isSavingEdit}
-                              onClick={cancelEditingHolding}
-                              type="button"
-                            >
-                              Cancel
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            className="rounded-full border border-stone-300 px-3 py-1 text-xs text-stone-600 transition hover:border-emerald-400 hover:text-emerald-700"
-                            disabled={refreshing || removingHoldingTicker !== null || savingHolding}
-                            onClick={() => startEditingHolding(holding)}
-                            type="button"
-                          >
-                            Edit
-                          </button>
-                        )}
-                        <button
-                          className="rounded-full border border-stone-300 px-3 py-1 text-xs text-stone-600 transition hover:border-rose-400 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
-                          disabled={isSavingEdit || isRemoving || refreshing}
-                          onClick={() => handleDeleteHolding(ticker)}
-                          type="button"
-                        >
-                          {isRemoving ? 'Removing...' : 'Remove'}
-                        </button>
-                      </div>
+            <section className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+              {recommendation ? (
+                <Panel
+                  title="Best stock to add next"
+                  subtitle="The highest-yielding dividend stock to grow your income fastest."
+                >
+                  <div className="grid gap-5">
+                    <div className="flex items-end justify-between">
+                      <h2 className="font-heading text-4xl tracking-[-0.05em] text-stone-950">
+                        {recommendation.ticker}
+                      </h2>
+                      <p className="rounded-full bg-emerald-100 px-3 py-1 text-sm text-emerald-900">
+                        {recommendation.annual_dividend_yield_percent.toFixed(2)}% yield
+                      </p>
                     </div>
-                  )
-                })}
-              </div>
-            </div>
-          </Panel>
-        </section>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <MetricRow
+                        label="Monthly income per $1"
+                        value={formatCurrency(recommendation.monthly_income_per_dollar)}
+                      />
+                      <MetricRow label="Share price" value={formatCurrency(recommendation.share_price)} />
+                    </div>
+                  </div>
+                </Panel>
+              ) : null}
+
+              {projectionRows.length > 0 ? (
+                <Panel title="Projection">
+                  <div className="grid gap-3">
+                    {projectionRows.map((row) => (
+                      <MetricRow key={row.label} label={row.label} value={row.value} />
+                    ))}
+                  </div>
+                </Panel>
+              ) : null}
+            </section>
           </>
         ) : null}
 
-        <footer className="pb-4 text-center text-xs uppercase tracking-[0.24em] text-stone-500">
+        <footer className="pb-4 text-center text-xs text-stone-500">
           {loading
             ? 'Loading dividend dashboard...'
             : refreshing
@@ -583,29 +550,11 @@ function Panel(props: { title: string; subtitle?: string; children: ReactNode })
   )
 }
 
-function StatCard(props: { label: string; subtitle?: string; value: string }) {
-  return (
-    <div className="rounded-[1.5rem] border border-stone-200 bg-stone-50 px-4 py-4">
-      <p className="text-xs uppercase tracking-[0.22em] text-stone-500">{props.label}</p>
-      <p className="mt-3 font-heading text-2xl tracking-[-0.04em] text-stone-950">{props.value}</p>
-      {props.subtitle ? <p className="mt-1 text-xs text-stone-500">{props.subtitle}</p> : null}
-    </div>
-  )
-}
-
 function MetricRow(props: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between rounded-[1.4rem] border border-stone-200 bg-stone-50 px-4 py-4">
       <span className="text-sm text-stone-600">{props.label}</span>
       <span className="font-medium text-stone-950">{props.value}</span>
-    </div>
-  )
-}
-
-function EmptyState(props: { message: string }) {
-  return (
-    <div className="rounded-[1.5rem] border border-dashed border-stone-300 bg-stone-50 px-4 py-8 text-center text-sm text-stone-500">
-      {props.message}
     </div>
   )
 }

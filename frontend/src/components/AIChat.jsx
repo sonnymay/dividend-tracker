@@ -49,11 +49,8 @@ export default function AIChat() {
     <section className="rounded-[2rem] border border-emerald-900/10 bg-[linear-gradient(135deg,_rgba(255,255,255,0.88),_rgba(223,239,228,0.72))] p-6 shadow-[0_24px_70px_rgba(51,41,24,0.08)] backdrop-blur motion-safe:animate-[rise_0.8s_ease-out] sm:p-7">
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="font-mono text-xs uppercase tracking-[0.28em] text-emerald-900/70">
-            AI portfolio chat
-          </p>
-          <h2 className="mt-2 font-heading text-2xl tracking-[-0.04em] text-stone-950">
-            Ask what your dividends can do next.
+          <h2 className="font-heading text-2xl tracking-[-0.04em] text-stone-950">
+            Ask a question
           </h2>
         </div>
         <p className="max-w-sm text-sm leading-6 text-stone-600">
