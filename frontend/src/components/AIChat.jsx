@@ -8,14 +8,14 @@ const STARTERS = [
   'How am I tracking toward my goal?',
 ]
 
+const INITIAL_MESSAGE = {
+  role: 'assistant',
+  content:
+    'Ask about retirement timing, dividend buying priorities, or monthly contribution plans grounded in your current portfolio.',
+}
+
 export default function AIChat() {
-  const [messages, setMessages] = useState([
-    {
-      role: 'assistant',
-      content:
-        'Ask about retirement timing, dividend buying priorities, or monthly contribution plans grounded in your current portfolio.',
-    },
-  ])
+  const [messages, setMessages] = useState([INITIAL_MESSAGE])
   const [question, setQuestion] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -45,6 +45,14 @@ export default function AIChat() {
     }
   }
 
+  function clearChat() {
+    setMessages([INITIAL_MESSAGE])
+    setError(null)
+    setQuestion('')
+  }
+
+  const userMessageCount = messages.filter((m) => m.role === 'user').length
+
   return (
     <section className="rounded-[2rem] border border-emerald-900/10 bg-[linear-gradient(135deg,_rgba(255,255,255,0.88),_rgba(223,239,228,0.72))] p-6 shadow-[0_24px_70px_rgba(51,41,24,0.08)] backdrop-blur motion-safe:animate-[rise_0.8s_ease-out] sm:p-7">
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -52,10 +60,28 @@ export default function AIChat() {
           <h2 className="font-heading text-2xl tracking-[-0.04em] text-stone-950">
             Ask a question
           </h2>
+          {userMessageCount > 0 ? (
+            <p className="mt-1 text-xs text-stone-400">
+              {userMessageCount} question{userMessageCount !== 1 ? 's' : ''} asked this session
+            </p>
+          ) : null}
         </div>
-        <p className="max-w-sm text-sm leading-6 text-stone-600">
-          Answers use your holdings, live prices, yields, and goal progress.
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="max-w-sm text-sm leading-6 text-stone-600">
+            Answers use your holdings, live prices, yields, and goal progress.
+          </p>
+          {userMessageCount > 0 ? (
+            <button
+              className="shrink-0 rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-500 transition hover:border-rose-300 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={loading}
+              onClick={clearChat}
+              title="Clear conversation"
+              type="button"
+            >
+              Clear chat
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <div className="flex h-[28rem] flex-col overflow-hidden rounded-[1.5rem] border border-white/80 bg-stone-50/90">
@@ -118,6 +144,12 @@ export default function AIChat() {
               className="h-12 flex-1 rounded-2xl border border-stone-200 bg-white px-4 text-base outline-none transition focus:border-emerald-700"
               disabled={loading}
               onChange={(event) => setQuestion(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault()
+                  ask(question)
+                }
+              }}
               placeholder="Ask about income, retirement timing, or next buys..."
               value={question}
             />
