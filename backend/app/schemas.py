@@ -98,3 +98,18 @@ class AIChatResponse(BaseModel):
     """AI-generated answer returned by the portfolio chat endpoint."""
 
     answer: str
+
+
+class PortfolioStats(BaseModel):
+    """Aggregated statistics for the full portfolio, suitable for an analytics endpoint."""
+
+    total_holdings: int
+    total_market_value: float
+    total_annual_income: float
+    total_monthly_income: float
+    average_dividend_yield_percent: float
+    highest_yield_ticker: str | None = None
+    lowest_yield_ticker: str | None = None
+    most_valuable_ticker: str | None = None
+    income_concentration_top3_percent: float
+    """Percentage of total monthly income contributed by the top 3 holdings."""
