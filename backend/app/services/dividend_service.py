@@ -242,7 +242,7 @@ def build_dashboard(holdings: list[HoldingResponse], goal: GoalResponse) -> Dash
     estimated_months_to_goal: float | None = None
     estimated_goal_date: date | None = None
 
-    if remaining_monthly_income == 0:
+    if goal.monthly_target > 0 and remaining_monthly_income == 0:
         estimated_weeks_to_goal = 0.0
         estimated_months_to_goal = 0.0
         estimated_goal_date = date.today()

@@ -49,14 +49,6 @@ Dividend Tracker exists to answer those three questions on one screen.
 - 📈 **Forward yield projections** — estimate future income based on current positions
 - 🔍 **Stock search** — add any ticker with live data from yfinance
 - 🌙 **Dark mode** — easy on the eyes for late-night portfolio reviews
-
-## Roadmap
-
-- [ ] CSV import/export for portfolio data
-- [ ] Dividend reinvestment (DRIP) calculator
-- [ ] Tax year summary and qualified vs. ordinary dividend breakdown
-- [ ] Email alerts for upcoming ex-dividend dates
-- [ ] Multi-currency support
 - 🔔 **Upcoming payouts** — ex-div and pay dates so you stop missing them
 - 🥧 **Position breakdown** — yield, weight, and income contribution per holding
 - 🤖 **AI Portfolio Chat** — ask retirement-timing, next-buy, and goal-tracking questions grounded in your holdings
@@ -177,5 +169,5 @@ This project is for **personal portfolio tracking and educational purposes only*
 ## Acknowledgements
 
 - [yfinance](https://github.com/ranaroussi/yfinance) for live price and dividend data
-- - [FastAPI](https://fastapi.tiangolo.com/) and [Recharts](https://recharts.org/) for the backend and charts
-  - - [Supabase](https://supabase.com/) and [OpenRouter](https://openrouter.ai/) for storage and the portfolio chat
+- [FastAPI](https://fastapi.tiangolo.com/) and [Recharts](https://recharts.org/) for the backend and charts
+- [Supabase](https://supabase.com/) and [OpenRouter](https://openrouter.ai/) for storage and the portfolio chat

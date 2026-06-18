@@ -200,7 +200,6 @@ class DividendServiceTests(unittest.TestCase):
         mock_table.delete.return_value.eq.assert_called_once_with("ticker", "SCHD")
         mock_table.insert.assert_called_once_with({"ticker": "VOO", "shares": 3.0})
 
-
     def test_build_dashboard_with_zero_monthly_target_gives_zero_progress(self) -> None:
         holdings = [
             HoldingResponse(
@@ -247,7 +246,9 @@ class DividendServiceTests(unittest.TestCase):
         self.assertEqual(dashboard.projection.remaining_monthly_income, 0.0)
         self.assertEqual(dashboard.projection.estimated_weeks_to_goal, 0.0)
         self.assertEqual(dashboard.projection.estimated_months_to_goal, 0.0)
-        self.assertEqual(dashboard.projection.estimated_goal_date, __import__('datetime').date.today())
+        self.assertEqual(
+            dashboard.projection.estimated_goal_date, __import__("datetime").date.today()
+        )
 
     def test_build_dashboard_with_no_holdings_returns_empty_state(self) -> None:
         goal = GoalResponse(id=1, monthly_target=500, weekly_investment=200)
