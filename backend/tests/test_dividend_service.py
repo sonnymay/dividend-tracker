@@ -201,5 +201,89 @@ class DividendServiceTests(unittest.TestCase):
         mock_table.insert.assert_called_once_with({"ticker": "VOO", "shares": 3.0})
 
 
+    def test_build_dashboard_with_zero_monthly_target_gives_zero_progress(self) -> None:
+        holdings = [
+            HoldingResponse(
+                id=1,
+                ticker="O",
+                shares=50,
+                price=55,
+                dividend_yield_percent=5.6,
+                annual_dividend_per_share=3.08,
+                annual_income=154.0,
+                monthly_income=12.83,
+                market_value=2750,
+                created_at=datetime.now(),
+            ),
+        ]
+        goal = GoalResponse(id=1, monthly_target=0, weekly_investment=0)
+
+        dashboard = build_dashboard(holdings, goal)
+
+        self.assertEqual(dashboard.progress_percent, 0.0)
+        self.assertIsNone(dashboard.projection.estimated_weeks_to_goal)
+        self.assertIsNone(dashboard.projection.estimated_goal_date)
+
+    def test_build_dashboard_goal_already_met_returns_100_percent_and_zero_weeks(self) -> None:
+        holdings = [
+            HoldingResponse(
+                id=1,
+                ticker="JEPI",
+                shares=200,
+                price=58,
+                dividend_yield_percent=7.8,
+                annual_dividend_per_share=4.52,
+                annual_income=904.0,
+                monthly_income=75.33,
+                market_value=11600,
+                created_at=datetime.now(),
+            ),
+        ]
+        goal = GoalResponse(id=1, monthly_target=50, weekly_investment=100)
+
+        dashboard = build_dashboard(holdings, goal)
+
+        self.assertEqual(dashboard.progress_percent, 100.0)
+        self.assertEqual(dashboard.projection.remaining_monthly_income, 0.0)
+        self.assertEqual(dashboard.projection.estimated_weeks_to_goal, 0.0)
+        self.assertEqual(dashboard.projection.estimated_months_to_goal, 0.0)
+        self.assertEqual(dashboard.projection.estimated_goal_date, __import__('datetime').date.today())
+
+    def test_build_dashboard_with_no_holdings_returns_empty_state(self) -> None:
+        goal = GoalResponse(id=1, monthly_target=500, weekly_investment=200)
+
+        dashboard = build_dashboard([], goal)
+
+        self.assertEqual(dashboard.current_monthly_income, 0.0)
+        self.assertEqual(dashboard.progress_percent, 0.0)
+        self.assertIsNone(dashboard.recommendation)
+        self.assertIsNone(dashboard.projection.estimated_weeks_to_goal)
+        self.assertEqual(len(dashboard.holdings), 0)
+
+    def test_build_dashboard_single_holding_with_zero_price_skipped_for_recommendation(
+        self,
+    ) -> None:
+        holdings = [
+            HoldingResponse(
+                id=1,
+                ticker="BROKEN",
+                shares=10,
+                price=0,
+                dividend_yield_percent=0,
+                annual_dividend_per_share=0,
+                annual_income=0,
+                monthly_income=0,
+                market_value=0,
+                created_at=datetime.now(),
+            ),
+        ]
+        goal = GoalResponse(id=1, monthly_target=100, weekly_investment=50)
+
+        dashboard = build_dashboard(holdings, goal)
+
+        self.assertIsNone(dashboard.recommendation)
+        self.assertIsNone(dashboard.projection.estimated_weeks_to_goal)
+
+
 if __name__ == "__main__":
     unittest.main()
