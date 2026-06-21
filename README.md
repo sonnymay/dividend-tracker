@@ -3,7 +3,7 @@
 [![CI](https://github.com/sonnymay/dividend-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/sonnymay/dividend-tracker/actions/workflows/ci.yml) [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688.svg)](https://fastapi.tiangolo.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Live Demo](https://img.shields.io/badge/demo-dividend--tracker.vercel.app-brightgreen)](https://dividend-tracker-pi-navy.vercel.app)
+[![Live Demo](https://img.shields.io/badge/demo-dividend--tracker-brightgreen)](https://dividend-tracker-pi-navy.vercel.app)
 
 > Track your dividend portfolio's yield, payout history, and breakdown — without juggling five brokerage tabs.
 
@@ -45,35 +45,35 @@ Dividend Tracker exists to answer those three questions on one screen.
 
 - 📊 **Portfolio overview** — total value, cost basis, forward yield
 - 📅 **Payout history** — past distributions visualized over time
-- 🤖 **AI portfolio chat** — ask questions about your holdings via natural language
+- 🤖 **AI portfolio chat** — ask questions about your holdings in natural language (OpenRouter)
 - 📈 **Forward yield projections** — estimate future income based on current positions
 - 🔍 **Stock search** — add any ticker with live data from yfinance
 - 🌙 **Dark mode** — easy on the eyes for late-night portfolio reviews
 - 🔔 **Upcoming payouts** — ex-div and pay dates so you stop missing them
 - 🥧 **Position breakdown** — yield, weight, and income contribution per holding
-- 🤖 **AI Portfolio Chat** — ask retirement-timing, next-buy, and goal-tracking questions grounded in your holdings
 - 📡 **Live price + dividend data** pulled from Yahoo Finance via `yfinance`
 
 ---
 
 ## Stack
 
-| Layer    | Tech                                                  |
+| Layer | Tech |
 |----------|-------------------------------------------------------|
 | Frontend | React 19, Vite, TypeScript, Recharts, Tailwind CSS v4 |
-| Backend  | FastAPI (Python 3.11+), Pydantic Settings             |
-| Data     | yfinance (Yahoo Finance) · Supabase · OpenRouter      |
-| Hosting  | Vercel (frontend) · Render (backend)                  |
+| Backend | FastAPI (Python 3.11+), Pydantic Settings |
+| Data | yfinance (Yahoo Finance) · Supabase · OpenRouter |
+| CI/CD | GitHub Actions · pre-commit · pytest |
+| Hosting | Vercel (frontend) · Render (backend) |
 
 ---
 
 ## Architecture
 
 ```
-┌───────────────┐      ┌──────────────┐      ┌──────────────┐
+┌───────────────┐     ┌──────────────┐     ┌──────────────┐
 │  React + Vite │ ───▶ │   FastAPI    │ ───▶ │   yfinance   │
-│   (Vercel)    │      │   (Render)   │      │  + Supabase  │
-└───────────────┘      └──────────────┘      └──────────────┘
+│   (Vercel)   │     │   (Render)   │     │  + Supabase  │
+└───────────────┘     └──────────────┘     └──────────────┘
 ```
 
 FastAPI handles ticker lookups via `yfinance` for live price and dividend history, persists user holdings in Supabase, and powers portfolio chat with OpenRouter. Recharts renders payout history and portfolio breakdown on the client.
@@ -115,15 +115,13 @@ cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
 pre-commit install
-cp .env.example .env   # then fill in SUPABASE_URL, SUPABASE_KEY, and OPENROUTER_API_KEY
+cp .env.example .env   # fill in SUPABASE_URL, SUPABASE_KEY, OPENROUTER_API_KEY
 uvicorn app.main:app --reload
 ```
 
 API runs at `http://localhost:8000`. Interactive docs at `/docs`.
 
-For Render deploys, set `SUPABASE_URL`, `SUPABASE_KEY`, and `OPENROUTER_API_KEY` on the backend web service.
-This app does not use `DATABASE_URL`. Use `/health/dependencies` to verify the backend
-can reach Supabase after deploy.
+For Render deploys, set `SUPABASE_URL`, `SUPABASE_KEY`, and `OPENROUTER_API_KEY` on the backend web service. Use `/health/dependencies` to verify connectivity after deploy.
 
 ### Frontend
 
@@ -144,7 +142,6 @@ App runs at `http://localhost:5173`.
 - [ ] Sector + geography breakdown
 - [ ] CSV import from broker statements
 - [ ] Dividend safety / payout ratio flags
-- [ ] Tests + CI (GitHub Actions)
 - [ ] Publish backend as a PyPI package
 
 ---
@@ -164,7 +161,6 @@ This project is for **personal portfolio tracking and educational purposes only*
 ## License
 
 [MIT](LICENSE) © Sonny May
-
 
 ## Acknowledgements
 
