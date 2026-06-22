@@ -1,0 +1,4 @@
+# Tell GitHub Linguist to treat the React frontend as documentation
+# so the repo's primary language shows as Python (the backend).
+# This does NOT affect how the code builds or runs.
+frontend/** linguist-documentation
