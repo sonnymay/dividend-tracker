@@ -49,7 +49,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 def _database_unavailable(error: Exception, action: str) -> HTTPException:
     logger.exception("Supabase %s failed.", action)
 
@@ -60,13 +59,11 @@ def _database_unavailable(error: Exception, action: str) -> HTTPException:
 
     return HTTPException(status_code=503, detail=detail)
 
-
 def execute_supabase(query: Any, action: str) -> Any:
     try:
         return query.execute()
     except Exception as error:
         raise _database_unavailable(error, action) from error
-
 
 def supabase_table(name: str) -> Any:
     try:
@@ -74,14 +71,12 @@ def supabase_table(name: str) -> Any:
     except Exception as error:
         raise _database_unavailable(error, f"connect to {name}") from error
 
-
 def list_raw_holdings() -> list[dict[str, Any]]:
     response = execute_supabase(
         supabase_table("holdings").select("*").order("created_at"),
         "list holdings",
     )
     return cast(list[dict[str, Any]], response.data or [])
-
 
 def get_goal_record() -> GoalResponse:
     response = execute_supabase(
@@ -99,7 +94,6 @@ def get_goal_record() -> GoalResponse:
         monthly_target=float(row["monthly_target"]),
         weekly_investment=float(row["weekly_investment"]),
     )
-
 
 def save_dividend_history(total_monthly_income: float) -> None:
     current_month = date.today().replace(day=1).isoformat()
@@ -127,7 +121,6 @@ def save_dividend_history(total_monthly_income: float) -> None:
             "insert dividend history",
         )
 
-
 def load_dashboard() -> DashboardResponse:
     goal = get_goal_record()
     holdings = enrich_holdings(list_raw_holdings())
@@ -135,12 +128,10 @@ def load_dashboard() -> DashboardResponse:
     save_dividend_history(dashboard.current_monthly_income)
     return dashboard
 
-
 @app.get("/health", tags=["Meta"])
 def healthcheck() -> dict[str, str]:
     """Return a simple liveness check."""
     return {"status": "ok"}
-
 
 @app.get("/health/dependencies", tags=["Meta"])
 def dependency_healthcheck(response: Response) -> dict[str, Any]:
@@ -170,12 +161,58 @@ def dependency_healthcheck(response: Response) -> dict[str, Any]:
         },
     }
 
-
 @app.get("/holdings", response_model=list[HoldingResponse], tags=["Holdings"])
 def get_holdings() -> list[HoldingResponse]:
     """Return all holdings enriched with live market data."""
     return enrich_holdings(list_raw_holdings())
 
+@app.get("/holdings/income-summary", tags=["Holdings"])
+def get_income_summary() -> dict[str, Any]:
+    """Return a portfolio-level income summary suitable for CAGR and trend analysis.
+
+    Aggregates enriched holdings into:
+    - total_annual_income: sum of all annual dividend income across holdings
+    - total_monthly_income: total_annual_income / 12
+    - total_market_value: total portfolio market value
+    - blended_yield_percent: income-weighted average yield across all positions
+    - top_income_contributors: top 5 holdings ranked by annual_income descending
+    - holding_count: number of distinct positions
+
+    The chart history endpoint (/chart) provides the monthly time-series needed
+    to compute 1y/3y/5y CAGR on the frontend.
+    """
+    holdings = enrich_holdings(list_raw_holdings())
+
+    total_annual_income = round(sum(h.annual_income for h in holdings), 2)
+    total_monthly_income = round(total_annual_income / 12, 2)
+    total_market_value = round(sum(h.market_value for h in holdings), 2)
+
+    blended_yield = (
+        round((total_annual_income / total_market_value) * 100, 4)
+        if total_market_value > 0
+        else 0.0
+    )
+
+    top_contributors = sorted(holdings, key=lambda h: h.annual_income, reverse=True)[:5]
+
+    return {
+        "total_annual_income": total_annual_income,
+        "total_monthly_income": total_monthly_income,
+        "total_market_value": total_market_value,
+        "blended_yield_percent": blended_yield,
+        "holding_count": len(holdings),
+        "top_income_contributors": [
+            {
+                "ticker": h.ticker,
+                "shares": h.shares,
+                "annual_income": h.annual_income,
+                "monthly_income": h.monthly_income,
+                "dividend_yield_percent": h.dividend_yield_percent,
+                "market_value": h.market_value,
+            }
+            for h in top_contributors
+        ],
+    }
 
 @app.post("/holdings", response_model=HoldingResponse, status_code=201, tags=["Holdings"])
 def create_holding(payload: HoldingCreate) -> HoldingResponse:
@@ -195,7 +232,6 @@ def create_holding(payload: HoldingCreate) -> HoldingResponse:
         raise HTTPException(status_code=500, detail="Unable to save holding.")
 
     return enrich_holdings(rows)[0]
-
 
 @app.put("/holdings/{holding_id}", response_model=HoldingResponse, tags=["Holdings"])
 def update_holding(holding_id: int, payload: HoldingUpdate) -> HoldingResponse:
@@ -217,7 +253,6 @@ def update_holding(holding_id: int, payload: HoldingUpdate) -> HoldingResponse:
         raise HTTPException(status_code=404, detail="Holding not found.")
 
     return enrich_holdings(rows)[0]
-
 
 @app.put("/holdings/by-ticker/{ticker}", response_model=HoldingResponse, tags=["Holdings"])
 def replace_holding_group(ticker: str, payload: HoldingUpdate) -> HoldingResponse:
@@ -256,7 +291,6 @@ def replace_holding_group(ticker: str, payload: HoldingUpdate) -> HoldingRespons
 
     return enrich_holdings(rows)[0]
 
-
 @app.delete("/holdings/{holding_id}", status_code=204, response_class=Response, tags=["Holdings"])
 def delete_holding(holding_id: int) -> Response:
     """Delete a single holding by ID."""
@@ -265,7 +299,6 @@ def delete_holding(holding_id: int) -> Response:
         "delete holding",
     )
     return Response(status_code=204)
-
 
 @app.delete(
     "/holdings/by-ticker/{ticker}", status_code=204, response_class=Response, tags=["Holdings"]
@@ -279,12 +312,10 @@ def delete_holding_group(ticker: str) -> Response:
     )
     return Response(status_code=204)
 
-
 @app.get("/goal", response_model=GoalResponse, tags=["Goal"])
 def get_goal() -> GoalResponse:
     """Return the current monthly income goal and weekly investment target."""
     return get_goal_record()
-
 
 @app.post("/goal", response_model=GoalResponse, tags=["Goal"])
 def save_goal(payload: GoalCreate) -> GoalResponse:
@@ -311,12 +342,10 @@ def save_goal(payload: GoalCreate) -> GoalResponse:
         weekly_investment=float(row["weekly_investment"]),
     )
 
-
 @app.get("/dashboard", response_model=DashboardResponse, tags=["Dashboard"])
 def get_dashboard() -> DashboardResponse:
     """Return the full dashboard: income summary, projection, and enriched holdings."""
     return load_dashboard()
-
 
 @app.get("/chart", response_model=list[ChartPoint], tags=["Dashboard"])
 def get_chart() -> list[ChartPoint]:
@@ -335,7 +364,6 @@ def get_chart() -> list[ChartPoint]:
         )
         for row in rows
     ]
-
 
 @app.post("/ai/chat", response_model=AIChatResponse, tags=["AI"])
 def chat_with_portfolio(payload: AIChatRequest) -> AIChatResponse:
