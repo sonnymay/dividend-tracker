@@ -14,10 +14,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Sector + geography breakdown
 - CSV import from broker statements
 - Dividend safety / payout ratio flags
-- Tests + CI (GitHub Actions)
 - Multi-currency support
 - Email alerts for upcoming ex-dividend dates
 - Tax year summary and qualified vs. ordinary dividend breakdown
+
+---
+
+## [0.6.0] – 2026-06-24
+
+### Added
+- `GET /holdings/income-summary` — portfolio-level income rollup: total annual/monthly income, total market value, blended yield %, holding count, and top 5 income contributors ranked by annual income. Designed to support 1y/3y/5y CAGR trend analysis on the frontend using the existing `/chart` time-series.
 
 ---
 
