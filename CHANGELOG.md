@@ -17,6 +17,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Multi-currency support
 - Email alerts for upcoming ex-dividend dates
 - Tax year summary and qualified vs. ordinary dividend breakdown
+- Portfolio benchmarking against S&P 500 and dividend index ETFs
 
 ---
 
